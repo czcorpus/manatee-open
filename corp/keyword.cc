@@ -121,9 +121,27 @@ Keyword::Keyword (Corpus *c1, Corpus *c2, WordList *wl1, WordList *wl2, float N,
         if (scoretype == "logL") {
             double e1 = c1size * (f1 + f2) / c12size;
             double e2 = c2size * (f1 + f2) / c12size;
-            score = 2 * (f1 * log(f1/e1) + f2 * log(f2/e2));
-            freqs[2*addfreqs.size() + 4] = e1;
-            freqs[2*addfreqs.size() + 5] = e2;
+            // log likelihood
+            score = 2 * (f1*log(f1/e1) + f2*log(f2/e2));
+            // relative risk
+            if (f2 == 0) {
+                freqs[2*addfreqs.size() + 4] = INFINITY;
+            } else {
+                freqs[2*addfreqs.size() + 4] = f1*c2size/f2*c1size;
+            }
+            // freqs[2*addfreqs.size() + 5] = e2;
+        } else if (scoretype == "chi2") {
+            double e1 = c1size * (f1 + f2) / c12size;
+            double e2 = c2size * (f1 + f2) / c12size;
+            // Pearson's chi-squared statistic (TODO Yates correction?)
+            score = (f1-e1)*(f1-e1)/e1 + (f2-e2)*(f2-e2)/e2;
+            // relative risk
+            if (f2 == 0) {
+                freqs[2*addfreqs.size() + 4] = INFINITY;
+            } else {
+                freqs[2*addfreqs.size() + 4] = f1*c2size/f2*c1size;
+            }
+            // freqs[2*addfreqs.size() + 5] = e2;
         } else {
             score = (fpm1 + N) / (fpm2 + N);
         }
