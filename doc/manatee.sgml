@@ -1,0 +1,602 @@
+<!doctype linuxdoc system>
+<!-- 	$Id: manatee.sgml,v 2.3 2004-04-20 07:10:28 pary Exp $   -->
+
+<article>
+ <title>Manatee (version 1.50)
+ <author>Pavel Rychly, TextForge
+ <date>April, 2004
+
+<sect>Introduction
+<p>
+The Manatee system is a collection of programs for text corpora
+indexing, querying, browsing and statistic computations. It includes
+a nice graphical user interface Bonito.
+
+
+<sect1>Installation
+<p>
+Standard <tt>make</tt> command is used for installation.  Edit the beginning 
+of Makefile to change default installation options:
+<descrip>
+<tag>MANATEE_DIR	</tag>directory of network server part
+<tag>EXEC_DIR		</tag>directory for executable files
+<tag>BONITO_DIR		</tag>Bonito directory
+<tag>MANATEE_USER	</tag>login name of Manatee server process
+<tag>SERVER_PORT	</tag>port number of Manatee server service
+<tag>SERVER_HOST	</tag>default hostname where Bonito connects to
+<tag>SERVER_COMMAND	</tag>default server command for local Bonito usage
+<tag>FROM_NET		</tag>default connection type (1 = network, 0 = local)
+<tag>SHOW_LICENSE	</tag>whether to show license.txt on startup (1) or not (0)
+<tag>DEFAULT_LANG	</tag>default language of Bonito interface
+<tag>MANATEE_REGISTRY	</tag>corpus configuration directory
+</descrip>
+<p>
+Then use: 
+<code>	
+	make [install-bonito|install-manatee|install-inetd]
+</code>
+to install different parts of the system from the following options:
+<descrip>
+  <tag>install-bonito</tag>   Install Bonito only
+  <tag>install-manatee</tag>  Install local server part only
+  <tag>install-inetd</tag>    Install local and network server
+</descrip>
+
+<tt>make install-*</tt> commands may require root permissions depending on
+your system configuration.
+
+<p>
+After server installation you should set the environment variable
+<tt>MANATEE_REGISTRY</tt> which indicates where the manatee system will find
+corpus configuration files.  e.g. (sh/bash users)
+<code>
+	MANATEE_REGISTRY=/your/path/to/manatee/registry
+	export MANATEE_REGISTRY
+</code>
+or (csh users)
+<code>
+	setenv MANATEE_REGISTRY /your/path/to/manatee/registry
+</code>
+
+You can add the above lines to your system-wide shell
+configuration file (<tt>/etc/profile</tt>, <tt>/etc/bashrc</tt>, <tt>/etc/csh.cshrc</tt>, ...)
+
+
+
+<sect2>Uninstallation<p>
+You can uninstall each part of the system by analogous commands:
+<code>	
+	make [uninstall-bonito|uninstall-manatee|uninstall-inetd]
+</code>
+
+<sect2>Trying Bonito<p>
+
+You can test Bonito with the SUSANNE corpus without installation of
+any part of the system:
+<itemize>
+  <item> Download susanne-bin.tgz from the www.textforge.cz site to
+      the directory containing Manatee installation files.
+
+   <item> Type <tt>make test-susanne</tt> to run Bonito.
+</itemize>
+
+<sect2>Bonito Customization<p>
+
+You can create your own Bonito distribution files corresponding to 
+your configuration (<tt>SERVER_HOST</tt>, <tt>SERVER_PORT</tt>, etc.). Use:
+<code>	
+	make [bonito-win.zip|bonito-src.zip|bonito-src.tgz]
+</code>
+<descrip>
+<tag>bonito-win.zip</tag>    Bonito executables for Windows platforms
+<tag>bonito-src.zip</tag>    Bonito sources in ZIP
+<tag>bonito-src.tgz</tag>    Bonito sources in tag.gz
+                  You need to install Tcl/Tk version 8.2 or higher 
+		  to run Bonito from sources.
+</descrip>
+
+<sect1>Input Format<p>
+During corpus building text data are transformed into binary
+data. Source format is so called <em>vertical text</em>. It is a plain text
+(ASCII) file in selected character encoding without any formating
+(word-processing options). Words are written in a column, i.e. each
+line contains one word, number or punctuation. Optional annotation is
+on the same line as the respective word divided by the tabulator
+character.  For example the following sentence:
+<p>
+<em>Suddenly, however, their posture changed and the game ended.</em>
+<p>
+is in vertical text:
+<verb>
+Suddenly
+,
+however
+,
+their
+posture
+changed
+and
+the
+game
+ended
+.
+</verb>
+and with lemma and tag annotation (modified "Lancaster" tagset from
+SUSANNE corpus):
+<verb>
+Suddenly	suddenly	RR
+,	-	YC
+however	however	RR
+,	-	YC
+their	their	APPGh2
+posture	posture	NN1n
+changed	change	VVDv
+and	and	CC
+the	the	AT
+game	game	NN1n
+ended	end	VVDv
+.	-	YF
+</verb>
+<p>
+XML tags are used for structural annotation (like sentence or paragraph
+boundaries, head lines etc.)  Fro example:
+<verb>
+&lt;doc id="G10" n=32>
+&lt;head type=min>
+FEDERAL
+CONSTITUTION
+&lt;g/>
+,
+1789
+&lt;/head>
+&lt;p n=1>
+&lt;g/>
+we
+the
+People
+of
+the
+United
+States
+&lt;g/>
+,
+in
+order
+to
+form
+</verb>
+
+<sect1>Corpus Building
+<p>
+You have to write a corpus configuration file (see the following
+ section) before corpus building.
+<p>
+Use the <tt>encodevert</tt> command to to build a corpus from  a
+vertical text.  The most common usage is 
+<code>
+     encodevert -c CORPUS_NAME
+</code>
+where <tt>CORPUS_NAME</tt> is the name of the corpus configuration
+file in the Manatee registry (defined in the <tt>MANATEE_REGISTRY</tt>
+environment variable) or a path to the corpus configuration file
+beginning with <tt>.</tt> or <tt>/</tt>.
+<p>
+See a result of the <tt>encodevert -h</tt> command for an options
+listing and examples.
+
+<sect1>Corpus Configuration<p>
+A corpus configuration is stored in one plain text (ASCII) file.  The name
+of such file is the ID of the corpus in the whole system.  The
+configuration consists of attribute-value pairs.  Each nonempty line
+begins with an option name and ends with an option value enclosed in
+quotation marks.  Values consisting of only lowercase letters can be
+written without quotation marks.
+
+<sect2>Configuration Options<p>
+Global options are described in the following table.
+<descrip>
+<tag>PATH</tag>		full path of the corpus home directory which contains
+		all data files
+
+<tag>INFO</tag>		arbitrary corpus information like source, size etc.
+		there is no automatic processing of this data.
+		If the value begins with the `@' character the rest is
+		taken as a full path of a file containing INFO data
+
+<tag>ENCODING</tag>	corpus encoding (should be one which Tcl supports)
+		default encoding is `ascii' -- 8bit ASCII encoding
+		Tcl version 8.3 supports following encodings: 
+		ascii big5 cp1250 cp1251 cp1252 cp1253 cp1254 cp1255 cp1256 cp1257 cp1258 cp437 cp737 cp775 cp850 cp852 cp855 cp857 cp860 cp861 cp862 cp863 cp864 cp865 cp866 cp869 cp874 cp932 cp936 cp949 cp950 dingbats euc-cn euc-jp euc-kr gb12345 gb1988 gb2312 identity iso2022 iso2022-jp iso2022-kr iso8859-1 iso8859-2 iso8859-3 iso8859-4 iso8859-5 iso8859-6 iso8859-7 iso8859-8 iso8859-9 jis0201 jis0208 jis0212 koi8-r ksc5601 macCentEuro macCroatian macCyrillic macDingbats macGreek macIceland macJapan macRoman macRomania macThai macTurkish macUkraine shiftjis symbol unicode utf-8
+		All available Tcl encoding can be displayed with the
+		Tcl command `puts [encoding names]'.  You can try the 
+		following command from the shell:
+<code>
+		% echo 'puts [encoding names]' | tclsh
+</code>
+
+<tag>VERTICAL</tag>	full path of the source vertical text, it is used only
+		by `encodevert' program, if the value starts with `|'
+		the rest is treated as a shell command, and the
+		vertical text will be taken from standard output of
+		the command
+
+<tag>DEFAULTATTR</tag>	default attribute for query evaluation
+
+<tag>ATTRIBUTE</tag>	definition of a positional attribute
+		at least one positional attribute should be defined, the first
+		defined attribute is the default one (in most cases it is the
+		word form and the name of this attribute is `word')
+
+<tag>STRUCTURE</tag>	definition of a structural tag
+
+<tag>ALIGNED</tag>		name of an aligned corpus
+		Both corpora should have a structural tag named `align'
+		with one to one correspondence of respective token
+		sequences.
+
+<tag>FULLREF</tag>		comma separated list of references which will be
+                displayed as a full reference in Bonito
+
+<tag>HARDCUT</tag>		maximum number of query result lines 
+
+<tag>MAXCONTEXT</tag>	maximum number of positions in context
+
+<tag>MAXDETAIL</tag>	maximum number of positions in detail
+
+<tag>REBUILDUSER</tag>	comma separated list of users with permition to
+		rebuild the corpus
+		special value "*" means any user can rebuild the
+		corpus
+</descrip>
+
+ATTRIBUTE and STRUCTURE options can be repeated and enriched with
+an additional information block.
+Additional attribute options are described in the following table.
+
+<descrip>
+<tag>LOCALE</tag>		locale code of a used language (and region). This
+		value is used in the query evaluation (of regular
+		expressions) and the concordance lines sorting
+<p>
+		default locale is standard Posix locale (`C')
+
+<tag>MULTIVALUE</tag>	indicate whether the attribute has multivalues
+<tag>MULTISEP</tag>	defines multivalue separator, if empty ("") value is
+		split into characters
+
+<tag>DYNAMIC</tag>		if this option exists given attribute is a dynamic one
+		and the value of this option is the name of C function
+		which defines given dynamic attribute
+
+<tag>DYNLIB</tag>		dynamic library containing given function
+
+<tag>FUNTYPE</tag>		type of given function
+  <descrip>
+		<tag>0 </tag>no extra argument
+		<tag>c </tag>one char extra argument
+		<tag>s </tag>one (const char*) extra argument
+		<tag>i </tag>one int extra argument
+		<tag>cc</tag> two char extra arguments
+		<tag>ii</tag> two int extra arguments
+		<tag>ss</tag> two (const char*) extra arguments
+		<tag>ci</tag> two extra arguments, first char, second int
+		<tag>cs, sc, si, ic, is</tag> likewise
+  </descrip>
+
+<tag>ARG1</tag>		the first optional fixed parameter
+
+<tag>ARG2</tag>		the second optional fixed parameter
+
+<tag>FROMATTR</tag>	the name of attribute from witch the given attribute is created
+
+<tag>TYPE</tag>		type of the dynamic attribute, possible values are: 
+    <descrip>
+		<tag>plain</tag> (default), lexicon, index
+		<tag>plain</tag> only displaying is enabled
+		<tag>lexicon</tag> displaying and counting (frequency 
+		             distribution) are enabled
+		<tag>index</tag> all features including querying are enabled
+    </descrip>
+<tag>TRANSQUERY</tag>	use transformation function for queries (multivalues
+		not supported)
+
+</descrip>
+
+In an additional information block of a STRUCTURE option there can be
+arbitrary many ATTRIBUTE options (with possible additional option blocks).
+<descrip>
+<tag>LABEL</tag>	       label used in references instead of STRUCTURE.ATTRIBUTE
+</descrip>
+
+<sect2>Examples<p>
+
+If your vertical text contains only words and no annotation,
+a configuration can be very simple:
+<code>
+PATH /corpora/test1
+ATTRIBUTE word
+</code>
+
+If you omit VERTICAL, you have to specify a source file for
+encodevert command:
+
+% encodevert -c test1 /corpora/src/test1.vertical
+
+VERTICAL addition simplifies encodevert command:
+
+% encodevert -c test2
+
+If you add REBUILDUSER you can rebuild your corpus directly from
+Bonito (menu item Corpus > Rebuild).
+
+<code>
+PATH /corpora/test1
+VERTICAL "/corpora/src/test1.vertical"
+REBUILDUSER "*"
+ATTRIBUTE word
+</code>
+
+
+Select an appropriate ENCODING for a proper display of characters in
+Bonito.  For each attribute you can specify a LOCALE for proper
+sorting and regular expression character classes handling.  Default
+'C' locale corresponds to English.  The following example uses ISO
+Latin 2 encoding and Czech locale.
+
+<code>
+PATH /corpora/test1
+VERTICAL "/corpora/src/test1.vertical"
+ENCODING "iso8859-2"
+ATTRIBUTE word {
+	  LOCALE "cs_CZ.ISO8859-2"
+}
+</code>
+
+
+If your vertical text contains a POS tagging for each token (word)
+specify also the second attribute. 
+
+<code>
+PATH /corpora/test1
+VERTICAL "/corpora/src/test1.vertical"
+ENCODING "iso8859-2"
+ATTRIBUTE word {
+	LOCALE "cs_CZ.ISO8859-2"
+}
+ATTRIBUTE pos
+</code>
+
+
+If your vertical text contains sentence boundaries annotated with &lt;s>
+and &lt;/s> and document boundaries annotated with &lt;doc> and &lt;/doc>, add
+structures definition.
+
+<code>
+PATH /corpora/test2
+VERTICAL "/corpora/src/test2.vertical"
+ENCODING "iso8859-2"
+ATTRIBUTE word 
+STRUCTURE doc
+STRUCTURE s
+</code>
+
+If your &lt;doc> annotation contains document meta-information about the
+author and the date of publication in form 
+&lt;doc author="Lewis Carroll" date="1876">
+add structure attribute definition.
+
+<code>
+PATH /corpora/test3
+VERTICAL "/corpora/src/test3.vertical"
+ENCODING "iso8859-2"
+ATTRIBUTE word 
+STRUCTURE doc {
+	ATTRIBUTE author
+	ATTRIBUTE date
+}
+STRUCTURE s
+</code>
+
+
+If your POS attribute contains ambiguous tags like NN1-VVB in BNC, and
+you would like to find this tag for [pos="NN1"] queries, add
+multivalue configuration.
+
+<code>
+PATH /corpora/test4
+ENCODING "iso8859-2"
+ATTRIBUTE word 
+ATTRIBUTE pos {
+	MULTIVALUE yes
+	MULTISEP "-"
+}
+</code>
+
+
+If you would like to add a dynamic attribute, add a new attribute
+definition.  In the following example the vertical text contains words
+only (one column), but the corpus has additional attribute lc
+generated from the word attribute.  Values of lc consists of
+respective words transformed into lowercase letters.  The
+transformation function is an internal function named `lowercase' (one
+can see the definition in stddynfun.c file).  It accepts two arguments:
+first is a word and second a locale (in this corpus "cs_CZ").
+DEFAULTATTR ensures that lc will be used in evaluation of queries
+without an attribute name.  TRANSQUERY ensures that the transformation
+function will be applied to a query string before query evaluation.
+
+<code>
+PATH /corpora/test1
+VERTICAL "/corpora/src/test1.vertical"
+ENCODING "iso8859-2"
+DEFAULTATTR lc
+ATTRIBUTE word {
+	LOCALE "cs_CZ"
+}
+ATTRIBUTE   lc {
+	LOCALE "cs_CZ"
+
+	DYNAMIC    lowercase
+	DYNLIB     internal
+	FUNTYPE    s
+	FROMATTR   word
+	ARG1       "cs_CZ"
+	TYPE 	   index
+	TRANSQUERY yes
+}
+</code>
+
+
+A transformation function of a dynamic attribute can also be an
+external function.  DYNLIB then shows the full path to a dynamic
+library.  The following example lists two dynamic attributes which
+add a lemma and a morphological annotation into a corpus.  Both
+transformation functions (tags and lemmata) returns ambiguous values
+separated by a comma.
+
+<code>
+PATH /corpora/test1
+VERTICAL "/corpora/src/test1.vertical"
+ENCODING "iso8859-2"
+
+ATTRIBUTE   word {
+	LOCALE "cs_CZ"
+}
+ATTRIBUTE   lemma {
+	 LOCALE "cs_CZ"
+	 DYNAMIC	lemmata
+         DYNLIB  	/corpora/bin/alibfun.so
+	 ARG1    	0
+	 FUNTYPE	i
+	 FROMATTR	word
+	 TYPE 		index
+
+	 MULTIVALUE	yes
+	 MULTISEP	","
+}
+ATTRIBUTE   tag {
+	 DYNAMIC	tags
+         DYNLIB  	/corpora/bin/alibfun.so
+	 FUNTYPE	0
+	 FROMATTR	word
+	 TYPE		index
+
+	 MULTIVALUE	yes
+	 MULTISEP	","
+}
+</code>
+
+
+Parallel corpora are handled as two separate corpora.  ALIGNED
+indicates the name of the parallel part.  Both corpora should have a
+structure named `align' with one to one correspondence of respective
+token sequences.  The following example shows two configuration files
+-- one for each corpus.
+
+<code>
+PATH /corpora/par-en
+VERTICAL "/corpora/src/par-en.vertical"
+ENCODING "iso8859-1"
+ATTRIBUTE word 
+STRUCTURE doc {
+	ATTRIBUTE id
+}
+STRUCTURE s
+STRUCTURE align
+ALIGNED	  parcs
+</code>
+
+<code>
+PATH /corpora/par-cs
+VERTICAL "/corpora/src/par-cs.vertical"
+ENCODING "iso8859-2"
+ATTRIBUTE word {
+	LOCALE "cs_CZ"
+}
+STRUCTURE doc {
+	ATTRIBUTE id
+}
+STRUCTURE s
+STRUCTURE align
+ALIGNED	  paren
+</code>
+
+
+The final example is a part of a BNC configuration.  It shows usage of
+INFO and FULLREF.
+
+<code>
+PATH   /corpora/bnc
+INFO   "British National Corpus"
+VERTICAL /corpora/src/bnc.vert
+ENCODING "iso8859-1"
+
+DEFAULTATTR lc
+
+FULLREF "bncdoc.id,bncdoc.author,bncdoc.title,bncdoc.date,bncdoc.info"
+
+ATTRIBUTE   word
+ATTRIBUTE   tag {
+	MULTIVALUE y
+	MULTISEP   "-"
+}
+
+ATTRIBUTE   lc {
+	DYNAMIC lowercase
+	DYNLIB  internal
+	FUNTYPE s
+	ARG1    "C"
+	FROMATTR word
+	TYPE   index
+	TRANSQUERY	yes
+}
+	
+STRUCTURE   bncdoc {
+	ATTRIBUTE id
+	ATTRIBUTE date
+	ATTRIBUTE year {
+		DYNAMIC firstn
+		DYNLIB  internal
+		FUNTYPE i
+		ARG1    4
+		FROMATTR date
+		TYPE   index
+	}
+	ATTRIBUTE author {
+		MULTIVALUE y
+		MULTISEP   ";"
+	}
+	ATTRIBUTE title
+	ATTRIBUTE info
+
+	ATTRIBUTE allava
+	ATTRIBUTE alltim
+	ATTRIBUTE alltyp
+
+	ATTRIBUTE wriaag
+	ATTRIBUTE wriad
+	ATTRIBUTE wriase
+}
+
+STRUCTURE   stext {
+	ATTRIBUTE org
+}
+STRUCTURE   text {
+	ATTRIBUTE org
+}
+
+STRUCTURE   s {
+	ATTRIBUTE n
+}
+
+STRUCTURE   p {
+	ATTRIBUTE rend
+}
+STRUCTURE   body 
+</code>
+
+
+
+
+
+</article>

@@ -1,0 +1,20 @@
+#!/bin/bash
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+    echo "Usage: addsatfiles CORPUS"
+	echo "Calls lsslex -s CORPUS STRUCTNAME STRUCTATTR for all structure attributes of the CORPUS"
+	exit 1;
+fi
+
+CORPPATH=`corpinfo -p $1`
+STRUCTATTRS=`corpinfo -g STRUCTATTRLIST $1`
+IFS=$','; for ATTR in $STRUCTATTRS; do
+	echo -n "Checking $ATTR..."
+	if [ -e $CORPPATH/$ATTR.token ]; then
+		echo "already compiled"
+	else
+		echo "compiling..."
+		IFS=$' '; lsslex -s $1 ${ATTR/./ };
+	fi
+done

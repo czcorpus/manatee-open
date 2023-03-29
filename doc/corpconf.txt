@@ -1,0 +1,452 @@
+A corpus configuration is stored in one text (ASCII) file.  The name
+of such file is the ID of the corpus in the whole system.  The
+configuration consists of attribute-value pairs.  Each nonempty line
+begins with an option name and ends with an option value enclosed in
+quotation marks.  Values consisting of only lowercase letters can be
+written without quotation marks.
+
+Global options are described in the following table.
+
+PATH		full path of the corpus home directory which contains
+		all data files
+
+INFO		arbitrary corpus information like source, size etc.
+		there is no automatic processing of this data.
+		If the value begins with the `@' character the rest is
+		taken as a full path of a file containing INFO data
+
+NAME		name of the corpus
+
+ENCODING	corpus encoding (should be one which Tcl supports)
+		default encoding is `iso8859-1'
+
+VERTICAL	full path of the source vertical text, it is used only
+		by `encodevert' program, if the value starts with `|'
+		the rest is treated as a shell command, and the
+		vertical text will be taken from standard output of
+		the command
+
+DEFAULTATTR	default attribute for query evaluation
+
+ATTRIBUTE	definition of a positional attribute
+		at least one positional attribute should be defined, the first
+		defined attribute is the default one (in most cases it is the
+		word form and the name of this attribute is `word')
+
+STRUCTURE	definition of a structural tag
+
+PROCESS		definition of a process for preprocessing text before
+		encoding a corpus or postprocessing corpus data
+
+ALIGNED		name of an aligned corpus
+		Both corpora should have a structural tag named `align'
+		with one to one correspondence of respective token
+		sequences.
+
+SHORTREF	atribute of a structure to display as a defaul
+                reference in concordance, defaults to the first
+                attribute of the first structure or '#' (token number)
+                if no attribute of a structure exists
+
+FULLREF		comma separated list of references which will be
+                displayed as a full reference in Bonito, defaults to
+		the first attribute of the first structure in the
+                corpus config file
+
+HARDCUT		maximum number of query result lines 
+
+MAXCONTEXT	maximum number of positions in context, default 100,
+                0 means unlimited
+
+MAXDETAIL	maximum number of positions in detail
+
+REBUILDUSER	comma separated list of users with permition to
+		rebuild the corpus
+		special value "*" means any user can rebuild the
+		corpus
+
+WPOSLIST
+LPOSLIST        list of word and lemma POS label-tag pairs
+		the first character of the string is a separator used
+		to separate values in the rest of the string
+		WPOSLIST is for the "tag" attribute
+		LPOSLIST is for the "lempos" suffixes 
+
+TAGSETDOC	URL to corpus tagset summary page, the link is
+		displayed on the concordance entry form
+
+SUBCORPATTRS	comma separated list of document attributes used for
+		creating subcorpora, use "|" insted of comma to
+		display atributes on the same row in the subcorpus
+		creation form
+
+
+WSATTR		attribute name for which word sketches are computed
+		defaults to "lempos" if the corpus has that attribute,
+		or "lemma" if the corpus has that attribute, or
+		DEFAULTATTR otherwise
+WSPOSLIST	LPOSLIST of word sketch POSes
+
+WSSTRIP		number of characters to strip from the end of a word
+		in a word skech listings
+		defaults to 2 if WSATTR is "lempos", or 0 otherwise
+WSBASE		path to word sketches data files
+		defaults to PATH/WSATTR-ws
+		use "none" to disable WordSketch menu items
+WSTHES		path to word sketches thesaurus data files
+		defaults to PATH/WSATTR-thes
+
+WSDIFFSTEP      minimum difference of WS scores to highlight in
+                different colors
+
+ATTRIBUTE and STRUCTURE options can be repeated and enriched with
+an additional information block.
+Additional attribute options are described in the following table.
+
+LOCALE		locale code of a used language (and region). This
+		value is used in the query evaluation (of regular
+		expressions) and the concordance lines sorting
+
+		default locale is standard Posix locale (`C')
+
+TYPE		Storage and access type of an attribute.
+		Use "FD_FGD" for corpora bigger than 200M tokens.
+		
+
+MULTIVALUE	indicate whether the attribute has multivalues
+  MULTISEP	defines multivalue separator, if empty ("") value is
+		split into characters
+
+DYNAMIC		if this option exists given attribute is a dynamic one
+		and the value of this option is the name of C function
+		which defines given dynamic attribute
+
+  DYNLIB	dynamic library containing given function
+
+  FUNTYPE	type of given function
+		0 -- no extra argument
+		c -- one char extra argument
+		s -- one (const char*) extra argument
+		i -- one int extra argument
+		cc -- two char extra arguments
+		ii -- two int extra arguments
+		ss -- two (const char*) extra arguments
+		ci -- two extra arguments, first char, second int
+		cs, sc, si, ic, is -- likewise
+
+  ARG1		the first optional fixed parameter
+
+  ARG2		the second optional fixed parameter
+
+  FROMATTR	the name of attribute from witch the given attribute is created
+
+  DYNTYPE	type of the dynamic attribute, possible values are: 
+		plain, lexicon, index (default)
+		plain -- only displaying is enabled
+		lexicon -- displaying and counting (frequency 
+		           distribution) are enabled
+		index -- all features including querying are enabled
+
+  TRANSQUERY	use transformation function for queries (multivalues
+		not supported)
+
+
+
+In an additional information block of a STRUCTURE option there can be
+arbitrary many ATTRIBUTE options (with possible additional option blocks).
+
+LABEL	       label used in references instead of <STRUCTURE>.<ATTRIBUTE>
+
+DISPLAYTAG     if '1' (by default) it displays a xml tag like <s>, <p>, ...
+	       set it to '0' not to display a tag, use other
+	       DISPLAY... options to modify concordance output
+DISPLAYCLASS   a class of included text
+DISPLAYBEGIN   _EMPTY_
+DISPLAYEND
+
+------------------------------------------------------------
+
+Examples
+--------
+
+If your vertical text contains only words and no annotation,
+a configuration can be very simple:
+
+-v-------------------- Example 1 --------------------v-
+PATH /corpora/test1
+ATTRIBUTE word
+-^-------------------- Example 1 --------------------^-
+
+
+If you omit VERTICAL, you have to specify a source file for
+encodevert command:
+
+% encodevert -c test1 /corpora/src/test1.vertical
+
+VERTICAL addition simplifies encodevert command:
+
+% encodevert -c test2
+
+If you add REBUILDUSER you can rebuild your corpus directly from
+Bonito (menu item Corpus > Rebuild).
+
+-v-------------------- Example 2 --------------------v-
+PATH /corpora/test1
+VERTICAL "/corpora/src/test1.vertical"
+REBUILDUSER "*"
+ATTRIBUTE word
+-^-------------------- Example 2 --------------------^-
+
+
+Select an appropriate ENCODING for a proper display of characters in
+Bonito.  For each attribute you can specify a LOCALE for proper
+sorting and regular expression character classes handling.  Default
+'C' locale corresponds to English.  The following example uses ISO
+Latin 2 encoding and Czech locale.
+
+-v-------------------- Example 3 --------------------v-
+PATH /corpora/test1
+VERTICAL "/corpora/src/test1.vertical"
+ENCODING "iso8859-2"
+ATTRIBUTE word {
+	  LOCALE "cs_CZ.ISO8859-2"
+}
+-^-------------------- Example 3 --------------------^-
+
+
+If your vertical text contains a POS tagging for each token (word)
+specify also the second attribute. 
+
+-v-------------------- Example 4 --------------------v-
+PATH /corpora/test1
+VERTICAL "/corpora/src/test1.vertical"
+ENCODING "iso8859-2"
+ATTRIBUTE word {
+	LOCALE "cs_CZ.ISO8859-2"
+}
+ATTRIBUTE pos
+-^-------------------- Example 4 --------------------^-
+
+
+If your vertical text contains sentence boundaries annotated with <s>
+and </s> and document boundaries annotated with <doc> and </doc>, add
+structures definition.
+
+-v-------------------- Example 5 --------------------v-
+PATH /corpora/test2
+VERTICAL "/corpora/src/test2.vertical"
+ENCODING "iso8859-2"
+ATTRIBUTE word 
+STRUCTURE doc
+STRUCTURE s
+-^-------------------- Example 5 --------------------^-
+
+If your <doc> annotation contains document meta-information about the
+author and the date of publication in form 
+<doc author="Lewis Carroll" date="1876">
+add structure attribute definition.
+
+-v-------------------- Example 6 --------------------v-
+PATH /corpora/test3
+VERTICAL "/corpora/src/test3.vertical"
+ENCODING "iso8859-2"
+ATTRIBUTE word 
+STRUCTURE doc {
+	ATTRIBUTE author
+	ATTRIBUTE date
+}
+STRUCTURE s
+-^-------------------- Example 6 --------------------^-
+
+
+If your POS attribute contains ambiguous tags like NN1-VVB in BNC, and
+you would like to find this tag for [pos="NN1"] queries, add
+multivalue configuration.
+
+-v-------------------- Example 7 --------------------v-
+PATH /corpora/test4
+ENCODING "iso8859-2"
+ATTRIBUTE word 
+ATTRIBUTE pos {
+	MULTIVALUE yes
+	MULTISEP "-"
+}
+-^-------------------- Example 7 --------------------^-
+
+
+If you would like to add a dynamic attribute, add a new attribute
+definition.  In the following example the vertical text contains words
+only (one column), but the corpus has additional attribute lc
+generated from the word attribute.  Values of lc consists of
+respective words transformed into lowercase letters.  The
+transformation function is an internal function named `lowercase' (one
+can see the definition in stddynfun.c file).  It accepts two arguments:
+first is a word and second a locale (in this corpus "cs_CZ").
+DEFAULTATTR ensures that lc will be used in evaluation of queries
+without an attribute name.  TRANSQUERY ensures that the transformation
+function will be applied to a query string before query evaluation.
+
+-v-------------------- Example 8 --------------------v-
+PATH /corpora/test1
+VERTICAL "/corpora/src/test1.vertical"
+ENCODING "iso8859-2"
+DEFAULTATTR lc
+ATTRIBUTE word {
+	LOCALE "cs_CZ"
+}
+ATTRIBUTE   lc {
+	LOCALE "cs_CZ"
+
+	DYNAMIC    lowercase
+	DYNLIB     internal
+	FUNTYPE    s
+	FROMATTR   word
+	ARG1       "cs_CZ"
+	TRANSQUERY yes
+}
+-^-------------------- Example 8 --------------------^-
+
+
+A transformation function of a dynamic attribute can also be an
+external function.  DYNLIB then shows the full path to a dynamic
+library.  The following example lists two dynamic attributes which
+add a lemma and a morphological annotation into a corpus.  Both
+transformation functions (tags and lemmata) returns ambiguous values
+separated by a comma.
+
+-v-------------------- Example 9 --------------------v-
+PATH /corpora/test1
+VERTICAL "/corpora/src/test1.vertical"
+ENCODING "iso8859-2"
+
+ATTRIBUTE   word {
+	LOCALE "cs_CZ"
+}
+ATTRIBUTE   lemma {
+	 LOCALE "cs_CZ"
+	 DYNAMIC	lemmata
+         DYNLIB  	/corpora/bin/alibfun.so
+	 ARG1    	0
+	 FUNTYPE	i
+	 FROMATTR	word
+
+	 MULTIVALUE	yes
+	 MULTISEP	","
+}
+ATTRIBUTE   tag {
+	 DYNAMIC	tags
+         DYNLIB  	/corpora/bin/alibfun.so
+	 FUNTYPE	0
+	 FROMATTR	word
+
+	 MULTIVALUE	yes
+	 MULTISEP	","
+}
+-^-------------------- Example 9 --------------------^-
+
+
+Parallel corpora are handled as two separate corpora.  ALIGNED
+indicates the name of the parallel part.  Both corpora should have a
+structure named `align' with one to one correspondence of respective
+token sequences.  The following example shows two configuration files
+-- one for each corpus.
+
+-v-------------------- Example 10a --- (paren) ------v-
+PATH /corpora/par-en
+VERTICAL "/corpora/src/par-en.vertical"
+ENCODING "iso8859-1"
+ATTRIBUTE word 
+STRUCTURE doc {
+	ATTRIBUTE id
+}
+STRUCTURE s
+STRUCTURE align
+ALIGNED	  parcs
+-^-------------------- Example 10a ------------------^-
+
+-v-------------------- Example 10b --- (parcs) ------v-
+PATH /corpora/par-cs
+VERTICAL "/corpora/src/par-cs.vertical"
+ENCODING "iso8859-2"
+ATTRIBUTE word {
+	LOCALE "cs_CZ"
+}
+STRUCTURE doc {
+	ATTRIBUTE id
+}
+STRUCTURE s
+STRUCTURE align
+ALIGNED	  paren
+-^-------------------- Example 10b ------------------^-
+
+
+The final example is a part of a BNC configuration.  It shows usage of
+INFO and FULLREF.
+
+-v-------------------- Example 11 -------------------v-
+PATH   /corpora/bnc
+INFO   "British National Corpus"
+VERTICAL /corpora/src/bnc.vert
+ENCODING "iso8859-1"
+
+DEFAULTATTR lc
+
+FULLREF "bncdoc.id,bncdoc.author,bncdoc.title,bncdoc.date,bncdoc.info"
+
+ATTRIBUTE   word
+ATTRIBUTE   tag {
+	MULTIVALUE y
+	MULTISEP   "-"
+}
+
+ATTRIBUTE   lc {
+	DYNAMIC lowercase
+	DYNLIB  internal
+	FUNTYPE s
+	ARG1    "C"
+	FROMATTR word
+	TRANSQUERY	yes
+}
+	
+STRUCTURE   bncdoc {
+	ATTRIBUTE id
+	ATTRIBUTE date
+	ATTRIBUTE year {
+		DYNAMIC firstn
+		DYNLIB  internal
+		FUNTYPE i
+		ARG1    4
+		FROMATTR date
+	}
+	ATTRIBUTE author {
+		MULTIVALUE y
+		MULTISEP   ";"
+	}
+	ATTRIBUTE title
+	ATTRIBUTE info
+
+	ATTRIBUTE allava
+	ATTRIBUTE alltim
+	ATTRIBUTE alltyp
+
+	ATTRIBUTE wriaag
+	ATTRIBUTE wriad
+	ATTRIBUTE wriase
+}
+
+STRUCTURE   stext {
+	ATTRIBUTE org
+}
+STRUCTURE   text {
+	ATTRIBUTE org
+}
+
+STRUCTURE   s {
+	ATTRIBUTE n
+}
+
+STRUCTURE   p {
+	ATTRIBUTE rend
+}
+STRUCTURE   body 
+-^-------------------- Example 11 -------------------^-

@@ -1,0 +1,58 @@
+Comunication protocol (Server <--> Bonito)
+
+get conclist beg end lcontext rcontext PAall PAkwic structs ref
+
+    beg > end => descending output
+    PA*:  - => default attribute
+	  comma (,) delimited list (CDL) of attributes: word,lemma,tag
+    structs:  CDL of structures
+	      doc.id	<doc id=...>
+	      p		<p>
+	      doc.*,p	<doc id=... author=...>
+
+    ref: #		position
+	 doc		structure number	doc#7
+	 doc.id		structure atribute	doc.id=ln1993/57
+	 =doc.id	structure atribute value	ln1993/57
+	 doc.*		all struct. attributes	<doc id=... autor=...>
+	 %format	user format, substitutes %(variable), %%
+
+    context:
+         -20# - characters in result	-20 -> from left border of KWIC
+	  20# /				 20 -> from right
+
+	 COUNT BEG/END COLL
+	       - < begin
+	       - > end
+		       0 KWIC
+		       1 first collocation
+		       2 second collocation
+
+	 -1:doc
+	  1:doc		<doc>	KWIC		</doc>
+	  1:s is same as -1:s
+	  0:s is same as 0# is same as 0
+	  0<0 - KWIC
+	  0>0 /
+
+
+    output:
+	ref \t left \t kwic \t right
+    options:
+	attrdelim   /
+	refdelim    ,
+
+tkget
+    output:
+	words tags words tags ...
+	tags: ref, kwic, attr, col1, col2, ...
+
+sort,distr {[DOC.]ATTR/ir|^} ctx[~ctx]
+	      i = ignore case
+	      r = retrograde
+              ^ = line group
+	docs.id/ir  ctx
+
+
+subcorp subcorpname corpus struct query
+   -> corpus:subcorpname  ~  within <struct query>

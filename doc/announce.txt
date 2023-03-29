@@ -1,0 +1,24 @@
+To: corpora@hd.uib.no
+Subject: Software: Manatee - corpus manager
+Reply-To: Pavel Rychly <pary@textforge.cz>
+
+I am pleased to announce that Manatee version 1.11 is now
+available. This is the first public release.
+
+The Manatee system is a collection of programs for text corpora
+indexing, querying, browsing and statistic computations. It includes
+a nice graphical user interface Bonito.
+
+Manatee could serve as a direct replacement for the Corpus Workbench
+(CQP) from the Stuttgart University, Manatee uses similar format of
+input texts and almost same query language.  It is also possible to
+convert CQP corpora into Manatee binary format using the `importcqp'
+utility included in the distribution.
+
+You are invited to visit
+    http://www.textforge.cz/
+for a more complete description of what Manatee is, and access 
+to the download files.
+
+--
+Pavel Rychly  (pary@textforge.cz)

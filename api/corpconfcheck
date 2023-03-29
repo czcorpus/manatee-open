@@ -1,0 +1,253 @@
+#!/usr/bin/python3
+import sys
+import re
+import os
+import logging
+import argparse
+import locale
+import urllib.request
+import manatee
+manatee.setEncoding('UTF-8')
+
+log = logging.getLogger("corpconfcheck")
+logging.basicConfig(format='%(levelname)s: %(message)s')
+
+def error(msg):
+    global ec
+    log.error(msg)
+    ec = 1
+
+def warning(msg):
+    log.warning(msg)
+
+def parse_poslist(poslist):
+    if not poslist:
+        return []
+    sep = poslist[0]
+    parts = poslist[1:].split(sep)
+    if len(parts) % 2 == 1:
+        raise ValueError()
+    if '' in parts:
+        raise ValueError()
+    return [parts[i:i+2] for i in range(0, len(parts), 2)]
+
+def check_locale(l):
+    try:
+        locale._setlocale(locale.LC_MONETARY, l)
+    except locale.Error:
+        return False
+    else:
+        return True
+
+parser = argparse.ArgumentParser(description='Check corpus registry file')
+parser.add_argument('--chroot', help='Root directory prefix', default='')
+parser.add_argument('--level', help='Logging level', choices=('WARNING', 'ERROR'), default='WARNING')
+parser.add_argument('corpname')
+args = parser.parse_args()
+corpname = args.corpname
+log.setLevel(getattr(logging, args.level))
+exists = lambda path: os.path.exists(args.chroot + path)
+
+try:
+    C = manatee.loadCorpInfo(corpname)
+except:
+    log.error("Registry file missing or invalid")
+    sys.exit(2)
+ec = 0
+
+attrs = list(filter(bool, C.find_opt('ATTRLIST').split(',')))
+structattrs = list(filter(bool, C.find_opt('STRUCTATTRLIST').split(',')))
+structs = list(filter(bool, C.find_opt('STRUCTLIST').split(',')))
+subcorpattrs = list(filter(bool, C.find_opt('SUBCORPATTRS').replace('|', ',').split(',')))
+doc = C.find_opt('DOCSTRUCTURE')
+
+####################
+# Serious mistakes #
+####################
+
+wsdef = C.find_opt('WSDEF')
+if wsdef and not exists(wsdef):
+    error("WSDEF file %s does not exist" % wsdef)
+wshist = C.find_opt('WSHIST')
+if wshist and not exists(wshist):
+    error("WSHIST file %s does not exist" % wshist)
+subcdef = C.find_opt('SUBCDEF')
+if subcdef and not exists(subcdef):
+    error("SUBCDEF file %s does not exist" % subcdef)
+gdexconf = C.find_opt('GDEXDEFAULTCONF')
+if gdexconf and not exists(gdexconf):
+    error("GDEXDEFAULTCONF file %s does not exist" % gdexconf)
+
+aligned = list(filter(bool, C.find_opt('ALIGNED').split(',')))
+aligndef = list(filter(bool, C.find_opt('ALIGNDEF').split(',')))
+if len(aligned) != len(aligndef) and len(aligndef) != 0:
+    error('Different number of ALIGNED and ALIGNDEF')
+for other_corpname in aligned:
+    try:
+        ci = manatee.loadCorpInfo(other_corpname)
+    except:
+        error('aligned corpus %s missing or broken' % other_corpname)
+        continue
+    other_aligned = ci.find_opt('ALIGNED').split(',')
+    if corpname not in other_aligned:
+        error('aligned corpus %s not aligned back' % other_corpname)
+
+if not C.find_opt('ENCODING'):
+    warning("ENCODING not specified")
+
+language = C.find_opt('LANGUAGE')
+defaultlocale = C.find_opt('DEFAULTLOCALE')
+if not language:
+    warning("LANGUAGE not specified")
+elif defaultlocale == 'C':
+    s = manatee.StrVector()
+    manatee.languages(s)
+    supported_languages = list(s)
+    if language not in supported_languages:
+        warning("Language '%s' is not supported and DEFAULTLOCALE is C" % language)
+if not check_locale(defaultlocale):
+    error(f"Locale {defaultlocale} is not supported")
+for attr in attrs + structattrs:
+    attrlocale = C.find_opt(attr + '.LOCALE')
+    if attrlocale == defaultlocale:
+        continue
+    if not check_locale(attrlocale):
+        error(f"Locale {attrlocale} of attribute {attr} is not supported")
+
+for subcorpattr in subcorpattrs:
+    if subcorpattr not in structattrs:
+        error("%s from SUBCORPATTRS does not exist!" % subcorpattr)
+
+if 'tag' in attrs:
+    tagsetdoc = C.find_opt('TAGSETDOC')
+    if not tagsetdoc:
+        warning("TAGSETDOC not specified")
+    else:
+        try:
+            urllib.request.urlopen(tagsetdoc, timeout=3)
+        except:
+            warning("TAGSETDOC seems to be a broken link")
+    wposlist = C.find_opt('WPOSLIST')
+    if not wposlist:
+        warning("WPOSLIST not specified")
+    else:
+        try:
+            parse_poslist(wposlist)
+        except ValueError:
+            error("Invalid WPOSLIST")
+
+if 'lempos' in attrs:
+    lposlist = C.find_opt('LPOSLIST')
+    if not lposlist:
+        warning("LPOSLIST not specified")
+    else:
+        try:
+            parse_poslist(lposlist)
+        except ValueError:
+            error("Invalid LPOSLIST")
+
+if C.find_opt('WSATTR').startswith('lempos') and wsdef and exists(wsdef):
+    wsp_line = [ll for ll in open(wsdef, encoding='utf-8') if ll.startswith('*WSPOSLIST')]
+    if wsp_line:
+        wsposlist = wsp_line[0].strip()[11:].strip('"')
+    else:
+        wsposlist = C.find_opt('WSPOSLIST')
+    try:
+        parse_poslist(wsposlist)
+    except ValueError:
+        error("Invalid WSPOSLIST")
+
+if doc not in structs:
+    warning("Missing or invalid DOCSTRUCTURE")
+elif doc + '.wordcount' not in structattrs:
+    warning("DOCSTRUCTURE should have attribute wordcount")
+
+##############
+# Bad style #
+##############
+
+if not re.match('^[_a-zA-Z][_a-zA-Z0-9]*$', os.path.basename(corpname)):
+    warning("Corpus registry file name should only contain alphanumeric characters + underscore and not begin with a digit")
+
+infohref = C.find_opt('INFOHREF')
+if not infohref:
+    warning("INFOHREF not specified")
+else:
+    try:
+        urllib.request.urlopen(infohref, timeout=3)
+    except:
+        warning("INFOHREF seems to be a broken link")
+
+if '@' not in C.find_opt('MAINTAINER'):
+    warning("MAINTAINER does not look like an e-mail address")
+
+if 'tag' in attrs and 'lemma' in attrs and 'lempos' not in attrs:
+    warning("lempos could be created from tag and lemma")
+
+if not C.find_opt('NOLETTERCASE') and 'word' in attrs and 'lc' not in attrs:
+    warning("Attribute 'word' is present but 'lc' is not!")
+
+if C.find_opt('WSDEF') and '_lc' in C.find_opt('WSATTR'):
+    warning("word sketches computed on lowercase attribute")
+
+url = doc+'.url'
+tld = doc+'.tld'
+website = doc+'.website'
+urldomain = doc+'.urldomain'
+if url in structattrs:
+    if tld not in structattrs:
+        warning("%s is present but %s is not!" % (url, tld))
+    if website not in structattrs:
+        warning("%s is present but %s is not!" % (url, website))
+    if urldomain not in structattrs:
+        warning("%s is present but %s is not!" % (url, urldomain))
+if url in subcorpattrs:
+    warning("%s is in SUBCORPATTRS!" % url)
+if tld in structattrs and tld not in subcorpattrs:
+    warning("%s not in SUBCORPATTRS!" % tld)
+if website in structattrs and website not in subcorpattrs:
+    warning("%s not in SUBCORPATTRS!" % website)
+if urldomain in structattrs and urldomain not in subcorpattrs:
+    warning("%s not in SUBCORPATTRS!" % urldomain)
+
+doc_topic = doc+'.topic'
+if doc_topic in structattrs and doc_topic not in subcorpattrs:
+    warning("%s not in SUBCORPATTRS!" % doc_topic)
+doc_genre = doc+'.genre'
+if doc_genre in structattrs and doc_genre not in subcorpattrs:
+    warning("%s not in SUBCORPATTRS!" % doc_genre)
+
+shortref = filter(bool, C.find_opt('SHORTREF').split(','))
+for ref in shortref:
+    if '#' in ref:
+        continue
+    ref = ref.lstrip('=')
+    if ref not in structattrs and ref not in structs:
+        warning("%s from SHORTREF does not exist!" % ref)
+
+############################
+# Various regression tests #
+############################
+
+if 'lemma' in attrs and C.find_opt('lemma.FROMATTR') == 'lempos_lc':
+    error("lemma made from lempos_lc")
+
+if os.path.dirname(C.find_opt('WSBASE')) != os.path.dirname(C.find_opt('WSTHES')):
+    error("WSBASE and WSTHES in different directories")
+
+tld = doc+'.tld'
+if tld in structattrs and C.find_opt('%s.DYNAMIC' % tld) == 'url3domain':
+    warning("%s created using url3domain" % tld)
+
+if '*' in C.find_opt('VERTICAL'):
+    warning("asterisk in VERTICAL not ordered, use {01..99} instead")
+
+if not C.find_opt('NOLETTERCASE') and 'UTF-8' == C.find_opt('ENCODING'):
+    if 'lc' in attrs and C.find_opt('lc.DYNAMIC') == 'lowercase':
+        error("lc.DYNAMIC should be utf8lowercase, not lowercase")
+    if 'lemma_lc' in attrs and C.find_opt('lemma_lc.DYNAMIC') == 'lowercase':
+        error("lemma_lc.DYNAMIC should be utf8lowercase, not lowercase")
+    if 'lempos_lc' in attrs and C.find_opt('lempos_lc.DYNAMIC') == 'lowercase':
+        error("lempos_lc.DYNAMIC should be utf8lowercase, not lowercase")
+
+sys.exit(ec)

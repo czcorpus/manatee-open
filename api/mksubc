@@ -1,0 +1,92 @@
+#!/usr/bin/python3
+#  Copyright (c) 2008-2015  Pavel Rychly, Milos Jakubicek, Vit Baisa
+from __future__ import print_function
+from __future__ import unicode_literals
+
+import sys
+import os
+from io import open
+
+try:
+    from urllib.parse import quote_plus
+except:
+    from urllib import quote_plus
+
+import manatee
+manatee.setEncoding("UTF-8")
+
+def create_subcorpus (corp, subcdir, subcname, strucname, query):
+    path = subcdir + '/' + quote_plus(subcname.encode('UTF-8')) + '.subc'
+    sys.stderr.write("Subcorpus %s..." % subcname)
+    if strucname == "-CQL-":
+        r = manatee.create_subcorpus (path, corp.eval_query (query), None)
+    else:
+        r = manatee.create_subcorpus (path, corp, strucname, query)
+    if not r:
+        sys.stderr.write("warning: empty subcorpus for query '%s %s'\n"
+                         % (strucname, query))
+        return None
+    sys.stderr.write("done\n")
+    return path
+
+def process_def_file (corpname, subcdir, infile):
+    sys.stderr.write("Compiling subcorpora...\n")
+    infile = open(infile)
+    corp = manatee.Corpus(corpname)
+    try:
+        os.mkdir(subcdir)
+    except FileExistsError:
+        pass
+    frqattrs = []
+    attrlist = corp.get_conf("ATTRLIST")
+    while 1:
+        line = infile.readline()
+        if not line:
+            break
+        if line.startswith('#') or not line.strip():
+            # ignore comments and empty lines
+            continue
+        if line.startswith('*FREQLISTATTRS'):
+            for attr in line.split()[1:]:
+                if attr not in attrlist:
+                    print(attr, "is listed in FREQLISTATTRS but is not a valid attribute, skipping", file=sys.stderr)
+                else:
+                    frqattrs.append (attr)
+        elif line.startswith('='):
+            subcname = line[1:].strip()
+            structname = infile.readline().strip()
+            query = infile.readline().strip()
+            if query.startswith('Q:'): # subcorpus from concordance, skip
+                continue
+            path = create_subcorpus (corp, subcdir, subcname, structname, query)
+            sys.stderr.flush()
+            if path and compile_stats:
+                for attr in frqattrs:
+                    for stat in compile_stats:
+                        os.system ("mkstats %s %s %s %s"
+                                    % (corpname, attr, stat, path))
+        else:
+            print('Subcorpus definition file format error: "', line.strip(),
+                    '"', file=sys.stderr)
+
+if __name__ == "__main__":
+    compile_stats = []
+    if len(sys.argv) > 2 and sys.argv[1] == "-s":
+        compile_stats = sys.argv[2].split(",")
+        sys.argv = sys.argv[2:]
+    if sys.argv[3:]: # process subcorpus
+        process_def_file (*sys.argv[1:])
+    else:
+        stat_names = ["frq", "arf", "docf", "fid", "aldf"]
+        usage = """Usage: mksubc [-s] CORPUS SUBCORP_DIR SUBCORP_DEF_FILE
+Creates subcorpora (*.subc) files according to subcorpus
+definition file (see doc/subcdef.txt)\n
+-s STATS          compute statistics for all FREQLISTATTRS,
+                  STATS is a comma separated list of statistics,
+                  which might be one of {}
+CORPUS            corpus configuration file
+SUBCORP_DIR       directory for the .subc to be stored
+SUBCORP_DEF_FILE  subcorpus definition file""".format(", ".join(stat_names))
+        print(usage, file=sys.stderr)
+
+# vim: ts=4 sw=4 sta et sts=4 si cindent tw=80:

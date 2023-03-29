@@ -1,0 +1,18 @@
+#!/usr/bin/python3
+
+import os, array, sys
+
+if len(sys.argv) != 2:
+    sys.stderr.write("Usage: mkisrt <PATH_TO_LEX_PREFIX>\n")
+    sys.exit (2)
+
+srtfile = open(sys.argv[1] + ".lex.srt", "rb")
+isrtfile = open(sys.argv[1] + ".lex.isrt", "wb")
+lexsize = os.fstat(srtfile.fileno()).st_size // 4
+
+fa = array.array("i")
+fa.fromfile (srtfile, lexsize)
+ta = array.array ("i", [0] * lexsize)
+for i in fa:
+  ta[fa[i]] = i
+ta.tofile (isrtfile)

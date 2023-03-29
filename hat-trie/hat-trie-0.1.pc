@@ -1,0 +1,12 @@
+
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: hat-trie
+Description: An efficient trie implementation.
+Version: 0.1.2
+Cflags: -I{includedir}
+Libs: -L${libdir}
+

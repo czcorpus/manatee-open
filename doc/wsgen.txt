@@ -1,0 +1,100 @@
+An input for the genws program is a word sketches definition file.
+It is a text (ASCII) file containing Manatee queries for each 
+grammatical relation (gramrel).
+
+Comments are lines beginning with the sharp character (#).
+Empty lines are ignored.
+
+Lines beginning with the equal character (=) are gramrel names.
+A gramrel name can contain any character with the exception of
+slash (/) for dual gramrels (see below), trailing white spaces
+are stripped off.
+
+Gramrel name is followed by gramrel queries, each query on
+a separate line. 
+A regular gramrel query have to contain two labeled positions with
+labels `1' and `2'.  One query should be on one line, use a backslash 
+(\) on the end of a line to split a query to multiple lines.
+
+Lines beginning with star (*) are processing directives.  They
+modify handling of following lines.
+
+*DEFAULTATTR sets the default attribute for query evaluation.
+    This directive is active to the end of the file or to the next
+    *DEFAULTATTR directive.
+
+*STRUCTLIMIT limits query results to a structure, for example
+    sentence.  The sequence of tokens in the result cannot cross
+    boundaries of the structure.  This directive is active to the
+    end of the file or to the next *STRUCTLIMIT directive.
+
+*SYMMETRIC evaluates queries also with the `1' and `2' labels
+    swapped. This directive is active up to the next gramrel line.
+
+*DUAL is similar to *SYMMETRIC but it affect gramrels.  It defines
+    two gramrels from the same set of gramrel queries.  Gramrel
+    names are separated by a slash (/).  All queries are evaluated
+    for the first gramrel and then for the second gramrel with the
+    `1' and `2' labels swapped.
+
+*UNARY says that the following gramrel is an unary relation.  Only
+    one label is used for unary gramrel queries.
+
+*TRINARY is used for trinary relations. These are translated into
+    regular binary relations with different names.  A name of a
+    trinary gramrel should contain `%s' and respective queries should
+    contain third label `3'.  A value of the word sketch base
+    attribute on the position labeled `3' is then substituted for `%s'
+    in the gramrel name.
+
+*SEPARATEPAGE says that the follwing TRINARY relation should be
+    displayed on a separate page with only links from the main
+    wordsketch page. Optional parameter is the name of the aggregated
+    gramrel name, defaults to the relation name with %s substituted to '*'.
+
+*COLLOC specifies a created value for the collocation.
+    It could contain '%' substitution strings, in the form
+    '%(n.attr)', where n is the numeric label used in the query,
+    and attr is the attribute name.  It use a created value for the
+    collocation instead of the attribute given by the WSATTR option.
+
+*CONSTRUCTION indicates that the following gramrel should be displayed
+    in the 'Constructions' list. Optional 
+-------------------- Examples --------------------
+
+# The following line sets the default attribute to `tag' so you can
+# write only `"NN1"' instead of `[tag="NN1"]'.
+*DEFAULTATTR tag
+
+# The following line limits all query results to sentences.
+*STRUCTLIMIT s
+
+# `adverb' gramrel definition
+=adverb
+   1:[] 2:"AV."
+   2:"AV." 1:[]
+
+# `and/or' gramrel definition
+=and/or
+*SYMMETRIC
+   1:[] [word="and"|word="or"] 2:[] & 1.tag = 2.tag
+
+# `modifier' and `modify' gramrels definition
+*DUAL
+=modifier/modify
+   2:"AJ." 1:"N.."
+
+*CONSTRUCTION -v$
+*UNARY
+=wh_word
+	1:[] [tag="AVQ"|tag="DTQ"|tag="PNQ"]
+
+*SEPARATEPAGE pp_X
+*TRINARY
+=pp_%s
+	1:[tag="N.."|tag="AJ."] 3:"PR." 2:"N.."
+
+
+=pp_pp
+*COLLOC "%(3.word)_%(2.word)-p"
+	1:[tag="N.."|tag="AJ."] 3:"PR." 2:"N.."

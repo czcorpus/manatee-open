@@ -1,0 +1,40 @@
+#!/bin/bash -e
+# Copyright 2017  Milos Jakubicek
+set -o pipefail
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 CORPUS [ NJOBS ]"
+    echo "Compile all dynamic attributes in parallel, use max NJOBS, defaults to `nproc` on this machine."
+    exit 1;
+fi
+
+echo "Preparing Makefile..."
+
+CORPUS=$1
+JOBS=${2:-`nproc`}
+
+ATTRLIST=`corpinfo -g ATTRLIST $CORPUS`
+STRUCTATTRLIST=`corpinfo -g STRUCTATTRLIST $CORPUS`
+MAKEFILE=`mktemp`
+
+DYNATTRS="dynattrs: "
+IFS=$','
+for ATTR in $ATTRLIST; do
+    [ `corpinfo -g $ATTR.DYNAMIC $CORPUS` ] || { ATTRS="$ATTRS $ATTR"; continue; }
+    DYNATTRS="$DYNATTRS $ATTR"
+    echo "$ATTR: `corpinfo -g $ATTR.FROMATTR $CORPUS`" >> $MAKEFILE
+    echo -e "\tmkdynattr $CORPUS $ATTR" >> $MAKEFILE
+done
+for ATTR in $STRUCTATTRLIST; do
+    [ `corpinfo -g $ATTR.DYNAMIC $CORPUS` ] || { ATTRS="$ATTRS $ATTR"; continue; }
+    DYNATTRS="$DYNATTRS $ATTR"
+    STRUCTNAME=`echo $ATTR | cut -f1 -d.`
+    echo "$ATTR: $STRUCTNAME.`corpinfo -g $ATTR.FROMATTR $CORPUS`" >> $MAKEFILE
+    echo -e "\tmkdynattr $CORPUS $ATTR" >> $MAKEFILE
+done
+echo $DYNATTRS > $MAKEFILE.fin
+cat $MAKEFILE >> $MAKEFILE.fin
+echo "$ATTRS: " >> $MAKEFILE.fin
+
+echo "Running make -j $JOBS -f $MAKEFILE.fin"
+make -j $JOBS -f $MAKEFILE.fin

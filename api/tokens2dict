@@ -1,0 +1,57 @@
+#!/usr/bin/python3
+# Copyright (c) 2015  Vojtech Kovar, Milos Jakubicek
+from __future__ import print_function
+from __future__ import unicode_literals
+
+import sys, array, manatee
+from math import log
+
+try: binary_stdout = sys.stdout.buffer
+except AttributeError: binary_stdout = sys.stdout
+
+def write_pcdict (attr1, attr2, freqsf1, freqsf2):
+    print('processing sorted data and writing lexicon ...', file=sys.stderr)
+    oldx = None
+    translations = []
+    for i, line in enumerate(sys.stdin):
+        if i and i % 1000000 == 0:
+            print('  %dM lines processed ...' % (i/1000000), file=sys.stderr)
+        x, y, fxy = map(int, line.rstrip('\n\r').split('\t'))
+        fx = float(freqs1[x])
+        fy = float(freqs2[y])
+        logdice = 14 + log(2 * fxy / (fx + fy), 2)
+        if x == oldx:
+            translations.append((-logdice, -fxy, y))
+        else: # new term => flush the best translations
+            if translations:
+                binary_stdout.write(b'~ ')
+                binary_stdout.write(attr1.id2str(oldx).encode('utf-8'))
+                binary_stdout.write(b'\n')
+                for ld, freq, yy in sorted(translations)[:10]:
+                    binary_stdout.write(("%s\t%.2f\t%d\n" % (attr2.id2str(yy),
+                            -ld, -freq)).encode('utf-8'))
+            oldx = x
+            translations = [(-logdice, -fxy, y)]
+
+#main
+if len(sys.argv) < 5:
+    print("Usage: %s <SRC_CORPUS> <DST_CORPUS> <SRC_ATTR> <DST_ATTR>" \
+          % sys.argv[0], file=sys.stderr)
+    exit(1)
+al1_corp = manatee.Corpus(sys.argv[1])
+al2_corp = manatee.Corpus(sys.argv[2])
+manatee.setEncoding(al1_corp.get_conf("ENCODING"))
+al1_attr = al1_corp.get_attr(sys.argv[3])
+al2_attr = al2_corp.get_attr(sys.argv[4])
+freqs1 = array.array("L")
+freqs2 = array.array("L")
+freqfile1 = al1_corp.get_conf("PATH") + al1_attr.name + ".align." \
+			+ al2_corp.get_conffile() + ".frq"
+freqfile2 = al2_corp.get_conf("PATH") + al2_attr.name + ".align." \
+			+ al1_corp.get_conffile() + ".frq"
+freqs1.fromfile (open(freqfile1, 'rb'), al1_attr.id_range())
+freqs2.fromfile (open(freqfile2, 'rb'), al2_attr.id_range())
+write_pcdict (al1_attr, al2_attr, freqs1, freqs2)
+print("Bilingual lexicon finished.", file=sys.stderr)
+
+# vim: ts=4 sw=4 sta et sts=4 si cindent tw=80:

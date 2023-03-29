@@ -1,0 +1,53 @@
+#!/usr/bin/python3
+#  Copyright (c) 2010-2015  Pavel Rychly
+from __future__ import print_function
+from __future__ import unicode_literals
+
+import manatee, os, sys
+
+try:
+    binary_stdout = sys.stdout.buffer
+except AttributeError:
+    binary_stdout = sys.stdout
+
+if not sys.argv[2:]:
+	print("""usage: freqs.py CORPUSNAME 'QUERY' 'CONTEXT' LIMIT [SUBCORPFILE]
+	 print frequency distribution of QUERY according to CONTEXT
+	 discarding items with frequency less than LIMIT
+	 default CONTEXT is 'word -1'
+	 default LIMIT is 0
+	 if SUBCORPFILE is given results are filtered for the specified subcorpus
+
+examples:freqs.py susanne '[lemma="house"]' 'word -1'
+ 	 freqs.py susanne '[lemma="run"]' 'word/i 0 tag 0 lemma 1' 2
+	 freqs.py susanne '[lemma="test"] []? [tag="NN.*"]' 'word/i -1>0' 0
+	 freqs.py susanne '[]' 'word 0 doc.year 0' 0 /path/to/file.subc
+	""")
+	sys.exit(1)
+
+if not os.getenv('MANATEE_REGISTRY'):
+	os.environ['MANATEE_REGISTRY'] = '/corpora/registry'
+
+
+corp = manatee.Corpus(sys.argv[1])
+manatee.setEncoding(corp.get_conf("ENCODING"))
+if len(sys.argv) > 5:
+	corp = manatee.SubCorpus (corp, sys.argv[5])
+result = corp.eval_query (sys.argv[2])
+
+if sys.argv[3:]:
+	context = sys.argv[3]
+else:
+	context = 'word -1'
+
+if sys.argv[4:]:
+	limit = int (sys.argv[4])
+else:
+	limit = 0
+    
+words = manatee.StrVector()
+freqs = manatee.NumVector()
+norms = manatee.NumVector()
+corp.freq_dist (result, context, limit, words, freqs, norms)
+for w,f,n in zip (words, freqs, norms):
+    binary_stdout.write(('\t'.join((w, str(f), str(n))) + "\n").encode("utf-8"))
