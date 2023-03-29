@@ -11,3 +11,7 @@ please refer to a respective branch (e.g. `release-2.214.1`).
 4. `make`
 5. `sudo make install`
 6. `sudo ldconfig`
+
+## Available versions
+
+* [2.214.1](https://github.com/czcorpus/manatee-open/tree/release-2.214.1)
