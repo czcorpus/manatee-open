@@ -5,6 +5,7 @@ please refer to a respective branch (e.g. `release-2.214.1`).
 
 ## How to build
 
+0. make sure `autoconf-archive` is installed
 1. clone the repository, make sure all the dependencies are installed (:construction: - list deps)
 2. `autoreconf --install --force`
 3. `configure --with-pcre`
