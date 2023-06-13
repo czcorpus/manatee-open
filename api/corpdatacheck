@@ -1,0 +1,185 @@
+#!/usr/bin/python3
+from __future__ import print_function
+from __future__ import unicode_literals
+
+import sys
+import os
+import subprocess
+import logging
+import manatee
+manatee.setEncoding('UTF-8')
+
+log = logging.getLogger("corpdatacheck")
+logging.basicConfig(format='%(levelname)s: %(message)s')
+
+def fatal(msg):
+    log.error(msg)
+    sys.exit(2)
+
+def error(msg):
+    global ec
+    log.error(msg)
+    ec = 1
+
+def warning(msg):
+    log.warning(msg)
+
+def works(command, some_output=False, no_errors=False, shell=True):
+    p = subprocess.Popen(command, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = p.communicate()
+    if p.returncode != 0:
+        return False
+    if some_output and not out:
+        return False
+    if no_errors and err:
+        return False
+    return True
+
+if len(sys.argv) < 2:
+    print("Usage: %s CORPUS" % sys.argv[0])
+    sys.exit(1)
+corpname = sys.argv[-1]
+try:
+    C = manatee.Corpus(corpname)
+except:
+    log.error("Registry file missing or invalid")
+    sys.exit(2)
+ec = 0
+
+attrs = list(filter(bool, C.get_conf('ATTRLIST').split(',')))
+structattrs = list(filter(bool, C.get_conf('STRUCTATTRLIST').split(',')))
+structs = list(filter(bool, C.get_conf('STRUCTLIST').split(',')))
+dynattrs = []
+nondynattrs = []
+for attr in attrs + structattrs:
+    if C.get_conf('%s.DYNAMIC' % attr):
+        dynattrs.append(attr)
+    else:
+        nondynattrs.append(attr)
+
+# optional VERTICAL checking
+if '--check-vertical' in sys.argv and not C.get_conf('VIRTUAL'):
+    print(" * vertical")
+    vertical = C.get_conf('VERTICAL').strip()
+    if vertical.startswith('|'):
+        p = subprocess.Popen(vertical[1:] + '| head', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = p.communicate()
+        if p.returncode != 0:
+            error("VERTICAL command '%s' failed" % vertical[1:])
+        elif not out:
+            error("VERTICAL command '%s' produces empty output" % vertical[1:])
+        else:
+            num_attrs = len([a for a in nondynattrs if '.' not in a])
+            sample_lines = [l for l in out.splitlines() if not l.startswith(b'<')]
+            for sample_line in sample_lines:
+                sample_line_len = len(sample_line.split(b'\t'))
+                if sample_line_len != num_attrs:
+                    warning('Number of columns in vertical (%d) does not match number of attributes'
+                            ' (%d) in line:".' % (sample_line_len, num_attrs))
+                    warning(sample_line.strip())
+                    break
+    else:
+        if not os.path.isfile(vertical):
+            error("VERTICAL file %s does not exist" % vertical)
+        else:
+            p = subprocess.Popen(['head', vertical], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out, err = p.communicate()
+            num_attrs = len([a for a in nondynattrs if '.' not in a])
+            sample_lines = [l for l in out.splitlines() if not l.startswith(b'<')]
+            for sample_line in sample_lines:
+                sample_line_len = len(sample_line.split(b'\t'))
+                if sample_line_len != num_attrs:
+                    warning('Number of columns in vertical (%d) does not match number of attributes'
+                            ' (%d) in line:".' % (sample_line_len, num_attrs))
+                    warning(sample_line.strip())
+                    break
+
+attribs = {}
+print(" * lexicon queries")
+for attr in attrs + structattrs:
+    try:
+        attrib = C.get_attr(attr)
+    except:
+        error("Attribute %s not found" % attr)
+        continue
+    if not attrib.id_range() > 0:
+        error("Missing or corrupted lexicon for %s" % attr)
+        continue
+    attribs[attr] = attrib
+    first = attrib.id2str(0)
+    last = attrib.id2str(attrib.id_range()-1)
+    for value in [first, last]:
+        value = value.replace('\\', '\\\\').replace('"','\\"')
+        if '.' in attr: # struct attribute
+            query = '<%s=="%s">' % (attr.replace('.', ' '), value)
+        else:
+            query = '[%s=="%s"]' % (attr, value)
+        rs = C.eval_query(query)
+        if rs.end():
+            error("Error searching for %s" % query)
+
+print(" * dynamic attributes")
+for attr in dynattrs:
+    if C.get_conf('%s.DYNTYPE' % attr) == 'freq':
+        continue
+    if '.' in attr: # struct attribute
+        fromattr = attr.split('.')[0] + '.' + C.get_conf('%s.FROMATTR' % attr)
+    else:
+        fromattr = C.get_conf('%s.FROMATTR' % attr)
+    if attr in attribs and fromattr in attribs:
+        if attribs[fromattr].id_range() > 100*attribs[attr].id_range():
+            warning("'%s' less than 1/100 the size of '%s'. Consider changing DYNTYPE to 'freq'" % (attr, fromattr))
+
+print(" * word sketches")
+wsdef = C.get_conf('WSDEF')
+if wsdef:
+    import wmap
+    wsbase = C.get_conf('WSBASE')
+    if not works('parws "%s" "%s" "%s" -1 | tail -n 1 | grep "with 0 errors"' % (corpname, wsdef, wsbase)):
+        error("Gramrel lexicon verification ended with errors")
+    elif not C.get_conf('VIRTUAL') and not os.path.isfile('%s.map0.com' % wsbase):
+        warning("old word sketch format")
+    else:
+        comvec = wmap.IntVector()
+        try:
+            wmap1 = wmap.WMap(wsbase, C, 0, "")
+            wmap2 = wmap1.nextlevel()
+            wmap3 = wmap2.nextlevel()
+            wmap3.getcommonest(comvec)
+            if comvec and comvec[0] == -1:
+                warning("LCM not compiled")
+        except RuntimeError as e:
+            if "empty wordmap" in e.message:
+                warning("word sketch is empty")
+            else:
+                raise
+
+print(" * sizes")
+sizesfile = os.path.join(C.get_conf('PATH'), 'sizes')
+if not os.path.exists(sizesfile):
+    error("Sizes not compiled")
+
+print(" * structure sanity")
+try:
+    csize = C.size()
+except:
+    error("Could not determine corpus size")
+    sys.exit(ec) # skip the following
+for struct in structs:
+    try:
+        s = C.get_struct(struct)
+    except:
+        error("Structure %s not compiled\n" % struct)
+        continue
+    ssize = s.size()
+    if ssize <= 0:
+        error("Invalid size of structure %s\n" % struct)
+        continue
+    x = s.beg(0)
+    if x < 0 or x > csize:
+        error("Invalid begin of first %s\n" % struct)
+    x = s.end(ssize - 1)
+    if x < 0 or x > csize:
+        error("Invalid end of last %s\n" % struct)
+
+sys.exit(ec)

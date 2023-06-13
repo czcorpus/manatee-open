@@ -1,0 +1,196 @@
+#!/usr/bin/python3
+# Copyright 2007-2016  Pavel Rychly, Milos Jakubicek
+from __future__ import unicode_literals
+from __future__ import print_function
+
+import sys
+
+try: binary_stdout = sys.stdout.buffer
+except AttributeError: binary_stdout = sys.stdout
+
+import manatee
+
+def print_region(region):
+    for i in range(0, len(region), 2):
+        binary_stdout.write(("%s " % region[i]).encode('utf8'))
+
+def print_result(kw_beg, kw_end, refattr, corp, attrs, structs, lrCtxSize,
+                 attrdelim, posdelim, kwicdelim, colls):
+    # SWIG workaround: char function arguments take only bytes in Py2
+    # and only unicode in Py3
+    posdelim = str(posdelim)
+    attrdelim = str(attrdelim)
+
+    kwicbeg, kwicend = kwicdelim.split(",")
+    if refattr:
+        try:
+            ref = corp.get_attr (refattr)
+            binary_stdout.write(('#%i,%s ' % (kw_beg, ref.pos2str(kw_beg)))
+                .encode('utf8'))
+        except manatee.AttrNotFound:
+            ref = corp.get_struct (refattr)
+            binary_stdout.write(('#%i,%s ' % (kw_beg, ref.num_at_pos(kw_beg)))
+                .encode('utf8'))
+    else:
+        binary_stdout.write(('#%i ' % kw_beg).encode('utf8'))
+
+    corpRegion = manatee.CorpRegion(corp, attrs, structs)
+    collposs = {}
+    c = 0
+    while c < len(colls):
+        collposs [colls[c+1]] = colls[c]
+        c += 2
+    reg_beg = kw_beg - lrCtxSize[0]
+    rel_end = kw_end - kw_beg
+    reg = corpRegion.region(reg_beg, kw_beg, posdelim, attrdelim)
+    print_region (reg)
+    if rel_end == 0: # structure
+        binary_stdout.write((kwicbeg + kwicend + " ").encode('utf8'))
+    else:
+        binary_stdout.write((kwicbeg + " ").encode('utf8'))
+    # XXX collocations should be handled in CorpRegion so as not to interfere
+    # with structures
+    if len(collposs) > 0:
+        reg_beg = kw_beg
+        for c in sorted(collposs.keys()):
+            reg = corpRegion.region(reg_beg, kw_beg + c, posdelim, attrdelim)
+            print_region (reg)
+            binary_stdout.write(("%s%d: " % (kwicbeg, collposs[c]))
+                    .encode("utf8"))
+            reg = corpRegion.region(kw_beg + c, kw_beg + c + 1, posdelim, attrdelim)
+            print_region (reg)
+            binary_stdout.write((kwicend + " ").encode('utf8'))
+            reg_beg = kw_beg + c + 1
+    else:
+        reg = corpRegion.region(kw_beg, kw_end, posdelim, attrdelim)
+        print_region (reg)
+    if rel_end != 0:
+        binary_stdout.write((kwicend + " ").encode('utf8'))
+    last = corpRegion.region(kw_end, kw_end+lrCtxSize[1], posdelim, attrdelim)
+    print_region(last)
+    binary_stdout.write(b"\n")
+
+def corp_query (corp, query, refattr, ctxSize, hardcut, attrs, structs,
+                defattr, gdex_conf, attrdelim, posdelim, kwicdelim, onlyhits):
+
+    if attrdelim[0] == "\\":
+        attrdelim = attrdelim.decode("string_escape")
+    if posdelim[0] == "\\":
+        posdelim = posdelim.decode("string_escape")
+    try:
+        ctxSize = int(ctxSize)
+        lrCtxSize = (ctxSize, ctxSize)
+    except:
+        lrCtxSize = map(int, ctxSize.split(","))
+
+    corp.set_default_attr(defattr)
+    result = corp.eval_query (query)
+    if onlyhits != False:
+        print(result.count_rest())
+        import sys
+        sys.exit(0)
+    colls = manatee.IntVector()
+    result.collocs (colls)
+    numofcolls = len (colls) / 2
+    if gdex_conf:
+        try:
+            import gdex
+        except:
+            import gdex_old as gdex
+        result.thisown = False
+        conc = manatee.Concordance()
+        conc.load_from_rs (corp, result)
+        conc.sync()
+        if gdex_conf == b"-":
+            gdex_conf = None
+        try:
+            G = gdex.GDEX (corp, gdex_conf)
+        except:
+            G = gdex.GDEX (corp) # old GDEX
+        G.entryConc (conc) # load input
+        if hardcut == -1:
+            hardcut = 100
+        G_sort = G.best_k (hardcut, hardcut) # compute and return sorted list
+        for _, concnum in G_sort:
+            colls = []
+            for i in range(1, conc.numofcolls() + 1):
+                collpos = conc.coll_beg_at (i, concnum)
+                if collpos != -1:
+                    colls.append (i)
+                    colls.append (collpos - conc.beg_at (concnum))
+            print_result(conc.beg_at(concnum), conc.end_at(concnum), refattr,
+                         corp, attrs, structs, lrCtxSize, attrdelim, posdelim,
+                         kwicdelim, colls)
+    else:
+        while (hardcut > 0 or hardcut == -1) and not result.end():
+            colls = manatee.IntVector()
+            result.collocs (colls)
+            colls = list(colls)
+            i = 0
+            while i < len(colls):
+                if colls[i] >= 100 or colls[i] <= -100:
+                    colls.pop(i)
+                    colls.pop(i)
+                else:
+                    i += 2
+            print_result(result.peek_beg(), result.peek_end(), refattr, corp,
+                         attrs, structs, lrCtxSize, attrdelim, posdelim,
+                         kwicdelim, colls)
+            result.next()
+            if hardcut != -1:
+                hardcut -= 1
+
+
+if __name__ == '__main__':
+    from sys import argv, path
+    import sysconfig
+    args = {"-r" : None, "-c" : 15, "-h" : -1, "-a": "DEFAULTATTR",
+            "-s" : "", "-k" : "<,>", "-g" : None, "-d": "DEFAULTATTR",
+            "-m" : sysconfig.get_paths()['purelib'] + "/bonito/", "-e": "/", "-l": " ",
+            "-n" : False}
+    if argv[2:]:
+        args["-d"] = manatee.Corpus (argv[1]).get_conf ("DEFAULTATTR")
+        args["-a"] = args["-d"]
+        import getopt
+        opts, _ = getopt.getopt(argv[3:], "r:c:h:a:s:d:g:m:e:l:k:u:n")
+        args.update(dict(opts))
+        if args["-k"].count(",") > 1:
+            raise Exception("KWIC delimiter must not contain a comma")
+        corp = manatee.Corpus (argv[1])
+        manatee.setEncoding(corp.get_conf("ENCODING"))
+        if "-u" in args:
+            corp = manatee.SubCorpus (corp, args["-u"])
+        path.insert(0, args["-m"])
+        corp_query(corp, argv[2], args["-r"], args["-c"], int(args["-h"]),
+                   args["-a"], args["-s"], args["-d"], args["-g"], args["-e"],
+                   args["-l"], args["-k"], args["-n"])
+    else:
+        print('''Usage: corpquery.py CORPUSNAME QUERY [ OPTIONS ]\n
+Options:\n
+  -r ATTR               reference attribute
+                        (default: %s)
+  -u SUBCPATH           path to subcorpus .subc file
+  -c LEFT,RIGHT | BOTH  left and right or both context length
+                        (default: %d)
+  -h LIMIT              maximum number of results
+                        (default: %d)
+  -a ATTR1,ATTR2,...    comma separated list of attributes to be shown
+                        (default: %s)
+  -s STR1,STR2...       comma separated list of structures to be shown
+                        (use struct.attr or struct.* to show structure attributes;
+                        (default: %s)
+  -d DEFAULT_ATTR       default positional attribute
+                        (default: %s)
+  -g GDEX_CONF          use GDEX with a given GDEX_CONF configuration file
+                        (default: %s; use - for default configuration)
+                        use -h to set the result size (default: 100)
+  -m GDEX_MODULE_DIR    GDEX module path (directory with gdex.py or gdex_old.py)
+                        (default: %s)
+  -e DELIMITER          positional attribute delimiter (default: %s)
+  -l DELIMITER          positions delimiter (default: %s)
+  -k BEGIN,END          mark beginning/end of KWIC by BEGIN/END (default: %s)
+  -n                    only count and print number of hits
+''' % (args["-r"], args["-c"], args["-h"], args["-a"], args["-s"], args["-d"], args["-g"],
+        args["-m"], args["-e"], args["-l"], args["-k"]), file=sys.stderr)
+
+# vim: ts=4 sw=4 sta et sts=4 si tw=80:

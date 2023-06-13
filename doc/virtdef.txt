@@ -1,0 +1,14 @@
+# Definition file for a virtual corpus is text file
+# 
+# Each section starts with an equal sign followed by corpus name.
+# Each line in a section describes one interval of tokens which are going to be
+# included in the virtual corpus, using a dollar sign ($) instead of
+# end position means using corpus final position.
+
+=desam
+100,1000
+5000,100000
+200000,800000
+
+=susanne
+0,$

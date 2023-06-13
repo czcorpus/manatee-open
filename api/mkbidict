@@ -1,0 +1,23 @@
+#!/bin/bash -e
+set -euo pipefail
+
+if [ "$#" -ne 4 ]; then
+    echo "Usage: mkbidict <CORPUS1> <CORPUS2> <ATTR1> <ATTR2>"
+	echo "Compiles bilingual dictionary from CORPUS1 on ATTR1 to CORPUS2 on ATTR2."
+	exit 1;
+fi
+
+CORPUS1=$1
+CORPUS2=$2
+ATTR1=$3
+ATTR2=$4
+BIDICTPATH="`corpinfo -p $CORPUS1`/bidict.$(basename ${CORPUS2}).$ATTR1.$ATTR2"
+BGRPATH="$BIDICTPATH".bgr
+
+echo "Computing alignment bigrams..."
+par2tokens $CORPUS1 $CORPUS2 $ATTR1 $ATTR2 | mkbgr -m 2 -b 32000000 "$BGRPATH"
+echo "Computing translation candidates..."
+lsbgr "$BGRPATH" | tokens2dict $CORPUS1 $CORPUS2 $ATTR1 $ATTR2  > "$BIDICTPATH"
+rm "$BGRPATH".*
+rm "`corpinfo -p $CORPUS1`/${ATTR1}.align.$(basename ${CORPUS2}).frq"
+rm "`corpinfo -p $CORPUS2`/${ATTR2}.align.$(basename ${CORPUS1}).frq"

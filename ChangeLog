@@ -1,0 +1,443 @@
+= Manatee changelog =
+
+
+=== 2.60.1 ===
+2012/07/18
+
+ * FIX: fix race conditions in parallel computation of sketches with *TRINARY gramrels involved
+ * parws can check gramrel lexicon consistency
+
+== 2.60 ==
+2012/07/10
+
+ * support labels in the second argument (right-hand side) of within/containing, e.g. (<s/> containing 1:[] 2:[]) & 1.tag=2.tag
+ * FIX: build with ruby 1.9
+
+=== 2.59.1 ===
+2012/10/24
+
+ * bugfix release for the stable branch
+ * FIX: build with ruby 1.9
+ * parws can check gramrel lexicon consistency
+ * FIX: fix race conditions in parallel computation of sketches with *TRINARY gramrels involved
+ * FIX: fix filling default value in unique attribute
+ * parws supports Python >= 2.4
+ * documentation included in the distribution tarball
+ * FIX: CQL: fix default attr setting for parallel corpus
+ * FIX: fix static build with finlib
+ * FIX: fix overflow on appending to a .text file larger than 4 (2^32) GB
+ * FIX: finlib: fix build with gcc down to 4.1.2 at least
+
+== 2.59 ==
+2012/06/29
+
+ * new internal function for dynamic attributes "getlastn" for extracting last n characters
+ * WMap support for access to the dictionary created by *COLLOC directives
+
+== 2.58 ==
+2012/06/25
+
+ * compatibility with ANTLR 3.4 C runtime
+ * hashws support for subcorpora
+ * more verbose output of encodevert by default
+ * FIX: closing structures at the end of compilation
+
+== 2.57 ==
+2012/06/08
+
+ * WMAP support for collocation index operations incl. COLLOC directives
+
+== 2.56 == 
+2012/06/06
+
+ * added fixcorp script for fixing corrupted indices
+ * support for extracting terms lexicon of word sketches
+
+== 2.55 ==
+2012/05/29
+
+ * support filtering multiword sketches by gramrels
+
+=== 2.54.1 ===
+2012/04/30
+
+ * FIX: minor fixes for nested structures
+
+== 2.54 ==
+2012/04/20
+
+ * faster evaluation of non-regex matching using == and !== operators
+ * FIX: utf8 lowercasing may have failed under specific circumstances
+ * FIX: dynamic attributes are cleared before recompilation
+ 
+
+== 2.53 ==
+2012/04/16
+
+ * enhanced frequency distribution of nested structures
+
+== 2.52 ==
+2012/04/05
+
+ * maximum allowed nested structures set to 100
+
+== 2.51 ==
+2012/03/14
+
+''' requires finlib >= 2.17 '''
+
+ * support for handling of unique attributes
+
+== 2.50 ==
+2012/03/05
+
+''' requires finlib >= 2.16 '''
+
+ * first support for multiword sketches
+
+== 2.49 ==
+2012/02/29
+
+ * FIX: fix mishandling default encoding value in wmap API
+ * support extracting terms from word sketches in API
+
+== 2.48 ==
+2012/02/22
+
+''' requires finlib >= 2.15 '''
+
+ * support for attribute values occurring more than 4G (2^32) times
+ * support for extracting terms from word sketches
+
+=== 2.47.1 ===
+2012/02/18
+
+ * FIX: fix encodevert segfaulting when run with -x
+
+== 2.47 ==
+2012/02/08
+
+''' requires finlib >= 2.14 '''
+
+ * support for lexicon size up to 4G (2^32 bytes)
+ * FIX: concordance first-letter pagination in case of multibyte characters
+ * FIX: mksubc does not fail on invalid attributes and empty subcorpora
+
+=== 2.46.1 ===
+2012/02/01
+ * FIX: case-insensitive frequency distribution of utf8 corpora
+ * FIX: do yet more tolerant Unicode conversion failure handling
+
+== 2.46 ==
+2012/01/25
+
+ * added indices of lexicon by sorted frequency
+ * FIX: encodevert handles absent structure attributes properly
+ * FIX: subcorpora contained first document range duplicated under specific circumstances
+ 
+=== 2.45.2 ===
+2011/12/08
+
+ * FIX: parallelization of sketches with m4 definitions or dual gramrels
+ * FIX: mkwmap correctly handles empty streams when joining, does not write zero counts
+  
+
+=== 2.45.1 ===
+2011/10/20
+
+ * FIX: do more tolerant Unicode conversion failure handling
+
+== 2.45 ==
+2011/10/07
+
+''' requires finlib >= 2.13 '''
+
+ * more descriptive CQL error messages
+ * support for Unicode input/output using manatee.setEncoding()
+ * automatic memory handling of Python objects
+ * encodevert, genws and mkwmap logs timestamp with each message
+ * prevent writing structures overflowing 32bit integer
+ * 32to64.py correctly handles multiple overflows and overflows between begin and end
+ * parallel computation of word sketches
+
+=== 2.44.1 ===
+2011/09/17
+
+ * FIX mkwmap: fixed join phase if partial join is bigger than 4GB
+
+== 2.44 ==
+2011/09/13
+
+ * MAXDETAIL defaults to MAXCONTEXT if not set in the configuration file
+
+== 2.43 ==
+2011/09/09
+
+ * MAXCONTEXT set to 100 by default
+
+=== 2.42.1 ===
+2011/09/07
+
+ * FIX: CQL evaluation in case concatenation subquery is empty
+
+== 2.42 ==
+2011/08/31
+
+ * mksubc prints progress on standard output
+ * mksubc does not fail if DOCSTRUCTURE does not exist
+
+== 2.41 ==
+2011/08/05
+
+ * compilecorp automatically runs mknorms to perform proper normalization per structure attribute
+ * mknorms support corpora over 2G
+
+=== 2.40.2 ===
+2011/08/04
+
+''' requires finlib >= 2.12.4 '''
+
+ * fix ordering of nested structures in concordance
+
+=== 2.40.1 ===
+2011/07/29
+ 
+ * FIX: extending concordance KWIC fixed for |kwic|>1 or KWIC interleaved with colloc
+
+== 2.40 ==
+2011/07/28
+
+ * intelligent autodetection of attribute locale
+
+== 2.39 ==
+2011/06/28
+
+ * support for excluding KWIC from collocations
+ * FIX: CQL evaluation: [attr="non-existing"]? [attr="existing"] returned empty result
+   instead of "existing" occurrences
+ * FIX: mksubc command failed to compute document frequencies on new subcorpus
+
+=== 2.38.2 ===
+2011/06/10
+
+ * FIX: encodevert support for memory-only corpora over 2GB
+
+=== 2.38.1 ===
+2011/06/02
+ 
+ * FIX: frequency distribution failing if case-insensitiv/retrograde
+
+== 2.38 ==
+2011/05/12
+
+ * CQL allows '<struct #N>' and '<struct !#N>' for matching N-th struct
+ * corpquery can sort results using GDEX and set default attribute
+ * improved display of concordance reference
+ * support for storing corpora over 2GB in memory only
+ * FIX: UTF-8 character counting and lower-casing
+
+=== 2.37.1 ===
+2011/05/05
+
+ * FIX: count collocations only once per context
+
+== 2.37 ==
+2011/04/30
+
+ * maximum nesting of structures limited to 10 by default
+
+=== 2.36.1 ===
+2011/04/21
+
+ * FIX: fix encodevert warning on nested structures printing corpus position instead of file line
+
+== 2.36 ==
+2011/04/06
+
+ * added parse2wmap for creating sketches from dependency input
+ * fixed dirty cache after rebuilding sketches
+ * fixed multiple memory leaks in SWIG API
+ * fixed mkvirt failing if corpus directory is missing
+ * changed default MANATEE_REGISTRY to /corpora/registry
+ * mksubc needs much less memory
+ 
+== 2.35 ==
+2011/03/15
+
+ * fix locating of nested structures
+ * support attribute-based pagination of concordances
+ * prevent colisions of wmap and manatee in SWIG api
+ * faster docf computation implemented in c++
+ * support for virtual corpora
+
+=== 2.34.1 ===
+2011/03/13
+
+ * faster docf computation (ca. 20 x)
+ * show Manatee exception messages in Python
+
+== 2.34 ==
+2011/03/05
+
+''' requires finlib >= 2.12 '''
+
+ * compilecorp support for creating subcorpora
+ * encodevert automatically closes too many nested structures
+ * mksubc computes frequency in documents into .docf files
+ * changed format of word sketch .rev file -- added support for collocations
+ * export exceptions into SWIG API
+ * regexp2ids takes voluntary filter pattern argument
+
+=== 2.33.2 ===
+2011/02/28
+
+ * FIX: compilecorp computes sizes for corpora without structures
+ * FIX: encodevert creates data dir with mode 755 instead of 751
+
+=== 2.33.1 ===
+2011/01/20
+
+ * FIX: ngrsave: added NGRAM_SIZE and IGNORE_PUNC parameters
+
+== 2.33 ==
+2011/01/11
+
+ * compilecorp precomputes file with token, word, doc, paragraph and sentence counts
+
+=== 2.32.2 ===
+2010/11/24
+
+ * FIX: encodevert looping on input containing NULL byte
+
+=== 2.32.1 ===
+2010/10/31
+
+ * FIX: "STRUCTLIMIT s" generates <s/> instead of deprecated <s>
+
+== 2.32 ==
+2010/10/27
+
+''' requires finlib >= 2.11 '''
+
+New Features:
+
+ * enhanced {{{corpquery}}} script which makes it possible to specify (via command-line options) reference attribute, context, limit for the number of results and structures and attributes to be printed
+ * new {{{parse2wmap}}} tool for generating sketches (data for wmap) from a positional attribute
+ * {{{ngrsave}}} can now print document IDs of duplicate n-grams instead of n-grams and number of documents
+ * after the compilation, {{{compilecorp}}} checks for temporary files that indicate an error
+ * enhancements to the CQL:
+  * new "==" and "!==" operators that perform a match against fixed string (i.e. not a regular expression)[[BR]]
+    Note that with two exceptions of "\"" and "\\" no expansions are performed
+    on the string.[[BR]]
+    Examples:[[BR]]
+    ".", "$", "~" matches a single dot, dollar sign and tilda, respectively,[[BR]]
+    "\n" matches a backslash followed by the character n,[[BR]]
+    "\"\\" matches a double-quotes character followed by a single backslash[[BR]]
+  * a {{{meet/union}}} query can occur at any position in the query and they are not introduced by the "MU" keyword, which is deprecated and raises an error
+  * old {{{within <str>}}} syntax has been already deprecated (in favor of consistent {{{within <str/>}}} and now raises an error as well
+  * support for inequality matching using new operators: "<=", "!<=", ">=", "!>=". The comparison on a string is performed in a way that compares numeric parts numerically and alphabetical parts alphabetically.
+    Examples:[[BR]] 
+    {{{[word>="cake"]}}} matches "cake" as well as "came",[[BR]]
+    {{{<doc id<="145UA01">}}} matches e.g. 145UA01, 143UA01, 145TA00 etc.
+  * {{{meet/union}}} queries can use numeric labels and be subject to global conditions as any other query parts -- e.g. {{{(meet 1:[] 2:[]) & 1.tag = 2.tag;}}}
+  * a frequency function (denoted simply as {{{f}}}) can be used as part of the query together with numeric labels -- e.g. {{{1:[] & f(1.word) >= 1000;}}}
+
+Bugfixes:
+
+ * encodevert -v works again
+ * encodevert can again read piped input data ("| <command>" in VERTICAL in corpus configuration file)
+ * CQL queries using parallel corpora notation work again
+ * UTF-8 support in regular expressions
+ * encodevert doesn't crash if no attributes are given in the configuration fail nor command-line
+
+=== 2.31.3 ===
+2010/10/27
+
+ * FIX: Computing frequency distribution of multivalue attributes
+ * FIX: Encodevert warns if there are are opened structures at the of the compilation -- this always indicates an error and in case of nested structures leads to significant performance loss.
+
+=== 2.31.2 ===
+2010/08/04
+
+ * FIX: compilecorp fails because of genhist.py which should be genhist
+ * FIX: strip spaces in all attribute values
+ * FIX: make dist* targets work again
+
+=== 2.31.1 ===
+2010/04/26
+
+ * FIX: crash when MANATEE_REGISTRY="" or config path is a directory
+
+== 2.31 ==
+2010/04/23
+
+''' requires finlib >= 2.10 '''
+
+New Features:
+ * support for nested structures
+Bugfixes: 
+ * fixed displaying of empty collocations
+
+== 2.30 ==
+2010/04/15
+
+New Features:
+ * "===NONE===" used as attribute default DEFAULTVALUE
+Bugfixes:
+ * fixed displaying concordance with empty nodes
+
+=== 2.29.1 ===
+2010/04/10
+
+ * FIX: typo in CQL parser causing the build to fail with C locale
+
+== 2.29 ==
+2010/04/07
+
+New Features:
+ * {{{compilecorp}}} script for complex handling of corpus and sketch compilation
+
+Bugfixes: 
+ * unfinished corpus data reports size 0, does not crash
+
+=== 2.28.1 ===
+2010/03/11
+
+ * FIX: encodevert limits its memory usage to available physical memory
+
+== 2.28 ==
+2010/01/19
+
+''' requires ANTLR3.2 or higher '''
+
+New Features:
+  * allow ${attribute} substitution in DISPLAYBEGIN/DISPLAYEND
+  * CQL enhancements:
+   * support for "<query> within <query>"
+   * "containing" as dual option to "within"
+   * enable meet/union query after within/containing
+   * support for "within NUMBER"
+
+Bugfixes:
+  * fixed mkwmrank on empty wmaps
+
+== 2.27 == 
+2010/01/11
+
+New Features:
+ * gcc 4.3 and 4.4 compatibility
+ * ANTLR 2.7.2 compatibility
+ * Python API scripts now part of the distribution
+
+[...]
+
+== 2.14 ==
+ * corpus size more than 2 billion tokens
+
+== 1.99 ==
+ * bug fixes in query evaluation, build 
+ 
+== 1.94 ==
+ * first public version 
+ 
+ 

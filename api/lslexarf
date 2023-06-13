@@ -1,0 +1,21 @@
+#!/usr/bin/python3
+# Copyright 2007-2015  Pavel Rychly
+from __future__ import print_function
+from __future__ import unicode_literals
+
+import manatee
+
+def list_lex_with_ARF (attr):
+    size = attr.size()
+    for i in range (0, attr.id_range()):
+        f = attr.freq(i)
+        print('%d\t%s\t%d\t%f' % (i, attr.id2str(i), f,
+                                  manatee.compute_ARF (attr.id2poss(i), f, size)))
+
+if __name__ == '__main__':
+    import sys
+    c = manatee.Corpus (sys.argv[1])
+    if sys.argv[2:]:
+        list_lex_with_ARF (c.get_attr (sys.argv[2], True))
+    else:
+        print('usage: lsclexarf.py CORPNAME ATTRNAME')

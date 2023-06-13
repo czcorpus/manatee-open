@@ -1,0 +1,120 @@
+#!/usr/bin/python3
+#  Copyright (c) 2014  Pavel Rychly
+from __future__ import print_function
+from __future__ import unicode_literals
+
+"""Decode a corpus -- creates a vertical file from encoded data
+"""
+
+import sys
+import manatee
+
+import bisect
+
+try:
+    range = xrange
+except:
+    pass
+
+try:
+    binary_stdout = sys.stdout.buffer
+except AttributeError:
+    binary_stdout = sys.stdout
+
+class PriorityQueue:
+    def __init__ (self):
+        self.queue = []
+        
+    def put(self, item):
+        if item:
+            bisect.insort(self.queue, item)
+
+    def get(self):
+        return self.queue.pop(0)
+
+    def top(self):
+        return self.queue[0]
+
+    def size(self):
+        return len(self.queue)
+
+class StructLines:
+    def __init__ (self, corp, structname, starttoken):
+        self.name = structname
+        self.struct = corp.get_struct(structname)
+        self.attrs = []
+        sa_list = corp.get_conf('STRUCTATTRLIST')
+        self.pos = corp.get_conf('STRUCTLIST').split(',').index(structname)
+        if len(sa_list) > 0:
+            sa_list = sa_list.split(',')
+            for sa in sa_list:
+                s,a = sa.split('.')
+                if s != structname:
+                    continue
+                self.attrs.append((a,self.struct.get_attr(a)))
+        self.currnum = self.struct.num_next_pos(starttoken)
+        if self.currnum < 0:
+            self.currnum = 0
+        #print 'StructLines', self.name, self.currnum
+        self.inside = False
+
+    def next_event (self):
+        if self.currnum >= self.struct.size():
+            return None
+        if self.inside:
+            tok = self.struct.end(self.currnum)
+            self.inside = False
+            self.currnum += 1
+            return (tok, -1*self.pos, '</%s>' % self.name, self)
+        else:
+            tok = self.struct.beg(self.currnum)
+            attrs = ''.join([' %s="%s"' % 
+                             (n, a.pos2str(self.currnum)
+                                 .replace('\\', '\\\\').replace('"', '\\"'))
+                             for n,a in self.attrs])
+            if self.struct.beg(self.currnum) == self.struct.end(self.currnum):
+                # empty tag
+                close = '/'
+                self.currnum += 1
+            else:
+                close = ''
+                self.inside = True
+            return (tok, self.pos, '<%s%s%s>' % (self.name, attrs, close), self)
+
+
+def decode_corpus (corp, do_dyn):
+    attrs = corp.get_conf('ATTRLIST')
+    structs = corp.get_conf('STRUCTLIST')
+    fromtok = 0
+    totok = corp.size()
+    attrs = [corp.get_attr(a).textat(fromtok) for a in attrs.split(',')
+             if do_dyn or not corp.get_conf(a+'.DYNAMIC')]
+    structs = [StructLines(corp, s, fromtok) for s in structs.split(',')]
+    nextstruct = PriorityQueue()
+    for s in structs:
+        nextstruct.put(s.next_event())
+    
+    for tok in range (fromtok, totok):
+        while nextstruct.top()[0] <= tok:
+            _, _, line, s = nextstruct.get()
+            binary_stdout.write(line.encode('UTF-8'))
+            binary_stdout.write(b'\n')
+            nextstruct.put (s.next_event())
+            
+        binary_stdout.write('\t'.join(a.next() for a in attrs).encode('UTF-8'))
+        binary_stdout.write(b'\n')
+    while nextstruct.size() and nextstruct.top()[0] == totok:
+        _, _, line, s = nextstruct.get()
+        binary_stdout.write(line.encode('UTF-8'))
+        binary_stdout.write(b'\n')
+            
+if __name__ == "__main__":
+    do_dyn = False
+    if sys.argv[1:]:
+        manatee.setEncoding("UTF-8")
+        if len(sys.argv) > 2 and sys.argv[2] == "--dynattr":
+            do_dyn = True
+        decode_corpus (manatee.Corpus(sys.argv[1]), do_dyn)
+    else:
+        print("Usage: %s CORPUS [--dynattr]" % sys.argv[0], file=sys.stderr)
+        print("Decodes a corpus -- creates a vertical file from encoded data", file=sys.stderr)

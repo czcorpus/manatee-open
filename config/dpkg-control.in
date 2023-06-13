@@ -1,0 +1,12 @@
+Package: manatee
+Version: @PACKAGE_VERSION@
+Section: nlp 
+Priority: optional
+Architecture: i386
+Essential: no
+Maintainer: Pavel Rychly <pary@fi.muni.cz>
+Provides: manatee
+Suggests: libpcre3-dev
+Description: Manatee Corpus Processing System
+   Manatee System supports corpus creation, querying,
+   collocations and frequency computing, ...

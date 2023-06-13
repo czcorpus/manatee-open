@@ -1,0 +1,110 @@
+Manatee (MANAging TExts Effectively)
+Bonito  (Basic Observing aNd Investigating Tool)
+
+Key features
+-------------
+
+* Manatee corpus manager
+  * language independence
+    - any set of tags can be used
+    - encoding could be selected from a wide range of encodings
+    - sorting and case folding is performed according to given language 
+      and encoding
+  * maximum corpus size 
+    - is from 800 mil. to 1 bil. tokens depending on the language
+    - for example 100 mil. Czech corpus has a lexicon containing more 
+      than 1.7 types (different word forms) and an English corpus of
+      the same size has a lexicon containing less than 800 types
+  * modular system
+
+
+* Manager usage
+  - GUI: Bonito
+  - programming: Perl, Python, C++
+  - command line
+
+* Corpus data
+  - positional attributes
+  - structures (XML elements)
+  - attributes of structures
+  - dynamic attributes
+  - multivalues
+
+
+Bonito
+------
+   
+* client/server application
+  - server (manateesrv) runs on UNIX, Windows 95+/NT
+  - client (Bonito) runs on UNIX + X Window, Windows 95+/NT, Macintosh
+  - Internet - even a modem connection is sufficient for proper work
+
+* powerful query language
+  - single attribute, i.e.: wordform or respective annotation (lemma, tag)
+  - regular expressions over attributes (word, lemma, tag)
+  - Boolean expressions (and, or, not) of attributes
+  - regular expressions over positions (sequence, omission,
+    alternation, repetition and arbitrary combinations)
+  - structures (like sentence boundaries): start tag, end tag, whole
+    structure 
+  - dynamic attributes and multivalues behave like regular attributes
+  - fast query evaluation of complex queries
+
+* easy to create concordance lists
+  - P/N filter (lines with matching positions in given span 
+    will remain in concordance list / will be deleted from conc. list)
+  - query history
+  - named queries (list of favorite queries with notes for immediate use)
+  - templates (substitution of parameters in templates of complex queries)
+
+* collocations
+  - locate and highlight words in context
+  - more than 1 collocation (no limit in number)
+  - collocation can occupy more than 1 position (sequence of words)
+
+* concordance manipulation
+  - save conc. list into text file
+  - print conc. list on printer
+  - delete selected lines
+  - reduce -- only given number of random lines remain in conc. list
+  - simple sort -- sort according to keywords, left or right context
+  - undo
+  - named concordances
+
+* concordance presentation
+  - selection of displayed positional/structural attributes, values of
+    structures 
+  - positional attributes only for keywords
+  - extended context
+  - interactive widening of extended context
+  - graphical view of occurrences
+
+* generic sort
+  - more than one sorting criteria
+  - duplicity elimination
+  - sort options (case folding, language dependent criteria, backward)
+
+* frequency distribution
+  - unlimited number of grouping levels
+  - subtotals
+  - frequencies of words (or values of other pos. attributes) in context
+
+* collocation candidates
+  - list of words in given span on given attributes
+  - MI-score, T-score for each word
+
+* basic handling of parallel (aligned) corpora
+
+
+* easy GUI localization
+  - English and Czech version of graphical user interface
+  - adding new language is only translation of two files 
+	(resource [480 lines], menu [80 lines])
+
+
+Programming
+-----------
+  * C++ sources
+  * swig
+  * loadable modules into Perl, Python, Ruby, Java
+

@@ -1,0 +1,95 @@
+###############################################################################
+# SkE histograms definition file
+###############################################################################
+#
+# Histograms can be defined in 3 ways. Either by specifying two CQL queries
+# Q1 and Q2, by specifying the name of grammatical relation (WS) for Word
+# Sketches or by specifying 1 or 2 global subcorpora. For each word the value
+# for the histogram is computed as follows:
+#
+# 1. Q1 and Q2 case
+#    a) if Q2 is specified:
+#               hist(word) = freq(Q1[word]) / (freq(Q1[word]) + freq(Q2[word]))
+#    b) if Q2 is omitted:
+#               hist(word) = freq(Q1[word]) / freq(word)
+#
+# 2. WS case:
+#               hist(word) = freq(WS[word]) / freq(word)
+#
+# 3. S1 and S2 case
+#    a) if S2 is specified:
+#               hist(word) = freq_S1(word) / (freq_S1(word) + freq_S2(word))
+#    b) if S2 is omitted:
+#               hist(word) = freq_S1(word) / freq(word)
+#
+# where
+# - Q1[word], Q2[word] denote the substitution of the word to the query for the
+#   %s wild character
+# - WS[word] denotes the occurances of the word in the grammatical relation WS
+# - freq(x) denotes the frequency of the entity x in the corpus
+# - freq_S1[word], freq_S2[word] denote the frequency of the word in global
+#   subcorpus S1, S2. Both global subcorpora must exist and must have
+#   frequencies compiled (the .frq files must be present)
+#
+# Apart from that, regular expression (RE) can be specified for removing some
+# words from consideration. Only the words matching the RE will be considered.
+# This is mainly for efficiency reasons -- the word is firstly matched with the
+# RE, then the query is computed.
+#
+# Also, threshold (TH) and color (CL) can be specified. If hist(word) is bigger
+# than the threshold, a note "usually in <histogram_HR_name>" is displayed in
+# word sketch, in color specified by CL. The defaults are 90 and "red". Colors
+# can be specified either as HTML aliases (red, blue) or by rgb(123, 231, 321)
+# notation.
+#
+# Histograms definition format
+# ----------------------------
+#
+# =histogram_id
+# HR Histogram human readable name  # optional
+# Q1 query_1
+# Q2 query_2                        # optional
+# RE regular_expression             # optional
+#
+# or
+#
+# =histogram_id
+# HR Histogram human readable name  # optional
+# WS wsdef_relation_name
+# RE regular_expression             # optional
+#
+# or
+#
+# =histogram_id
+# HR Histogram human readable name  # optional
+# S1 global_subcorpus_1
+# S2 global_subcorpus_2             # optional
+# RE regular_expression             # optional
+#
+# All strings starting with # are comments and are ignored to the end of line.
+#
+###############################################################################
+
+=passive_all
+HR passive
+WS passive
+RE -v$
+
+=plurals
+HR plural
+Q1 [lempos="%s" & tag="NN2"]
+Q2 [lempos="%s" & tag="NN1"]
+RE -n$
+
+=ing_noing
+HR -ing
+Q1 [lempos="%s" & tag="V.G"]
+RE -v$
+CL blue
+
+=spoken
+S1 spoken
+TH 50
+RE -[nvj]$
+CL rgb(50, 50, 100)
+

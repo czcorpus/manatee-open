@@ -1,0 +1,71 @@
+                    INPUT FORMAT
+
+During corpus building text data are transforms into binary
+data. Source format is so called "vertical text". It is plain text
+(ASCII) file in selected character encoding without any formating
+(word-processing options). Words are written in a column, i.e. each
+line contains one word, number or punctuation. Optional annotation is
+on the same line as the respective word divided by the tabulator
+character.  For example the following sentence:
+
+Suddenly, however, their posture changed and the game ended.
+
+is in vertical text:
+
+Suddenly
+,
+however
+,
+their
+posture
+changed
+and
+the
+game
+ended
+.
+
+and with lemma and tag annotation (modified "Lancaster" tagset from
+SUSANNE corpus):
+
+Suddenly	suddenly	RR
+,	-	YC
+however	however	RR
+,	-	YC
+their	their	APPGh2
+posture	posture	NN1n
+changed	change	VVDv
+and	and	CC
+the	the	AT
+game	game	NN1n
+ended	end	VVDv
+.	-	YF
+
+
+XML tags are use for structural annotation (like sentence or paragraph
+boundaries, head lines etc.).  Fro example:
+
+<doc id="G10" n=32>
+<head type=min>
+FEDERAL
+CONSTITUTION
+<g/>
+,
+1789
+</head>
+<p n=1>
+"
+<g/>
+we
+the
+People
+of
+the
+United
+States
+<g/>
+,
+in
+order
+to
+form
