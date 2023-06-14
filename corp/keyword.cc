@@ -79,8 +79,8 @@ Keyword::Keyword (Corpus *c1, Corpus *c2, WordList *wl1, WordList *wl2, float N,
     const float c2size = c2->search_size();
     const float c12size = c1size + c2size;
     const float wl1_maxid = wl1->id_range();
-    Frequency *stat1 = wl1->get_stat(frqtype);
-    Frequency *stat2 = wl2->get_stat(frqtype);
+    Frequency *stat1 = wl1->get_stat(ftype.c_str());
+    Frequency *stat2 = wl2->get_stat(ftype.c_str());
     vector<AllowMissingFrequency> addfreqs1, addfreqs2;
     for (auto it = addfreqs.begin(); it != addfreqs.end(); it++) {
         addfreqs1.emplace_back(wl1, (*it).c_str());
