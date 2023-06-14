@@ -1,5 +1,6 @@
 //  Copyright (c) 2016-2023  Milos Jakubicek
 
+#include <cmath>
 #include <finlib/regpref.hh>
 #include "subcorp.hh"
 #include "keyword.hh"
