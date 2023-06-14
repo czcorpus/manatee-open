@@ -16,3 +16,4 @@ please refer to a respective branch (e.g. `release-2.214.1`).
 ## Available versions
 
 * [2.214.1](https://github.com/czcorpus/manatee-open/tree/release-2.214.1)
+* [2.223.6](https://github.com/czcorpus/manatee-open/tree/release-2.223.6)
