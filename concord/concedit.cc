@@ -31,7 +31,7 @@ void Concordance::reduce_lines (const char *crit)
         newsize = int (newsize * scale * viewsize());
     if (newsize >= viewsize())
         return;
-    
+
     if (view) {
         delete view;
         view = NULL;
@@ -166,7 +166,7 @@ void Concordance::delete_pnfilter (int collnum, bool positive)
 void Concordance::swap_kwic_coll (int collnum)
 {
     sync();
-    if (collnum < 1 || unsigned (collnum) > colls.size() 
+    if (collnum < 1 || unsigned (collnum) > colls.size()
         || coll_count [collnum -1] == 0)
         return;
     collnum--;
@@ -214,6 +214,13 @@ void Concordance::extend_kwic_coll (int collnum)
     coll_count [collnum - 1] = 0;
 }
 
+
+int custom_rand(int i)
+{
+    return 1697845303 % i;
+}
+
+
 void Concordance::shuffle()
 {
     sync();
@@ -222,7 +229,7 @@ void Concordance::shuffle()
         for (ConcIndex i=0; i < size(); i++)
             (*view)[i] = i;
     }
-    random_shuffle(view->begin(), view->end());
+    random_shuffle(view->begin(), view->end(), custom_rand);
 }
 
 void Concordance::switch_aligned (const char *corpname)
@@ -285,7 +292,7 @@ void Concordance::add_aligned (const char *corpname)
     if (! corp->get_conf("ALIGNDEF").empty())
         map = full_level(corp->get_aligned_level(cdata->corp->get_conffile()));
     NumOfPos align_num, align_end;
-    bool empty; 
+    bool empty;
     for (int i = 0; i < used; i++) {
         // XXX finding first token of the kwic only
         align_num = align->rng->num_next_pos (rng[i].beg);
