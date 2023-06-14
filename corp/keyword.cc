@@ -76,6 +76,7 @@ Keyword::Keyword (Corpus *c1, Corpus *c2, WordList *wl1, WordList *wl2, float N,
 
     const float c1size = c1->search_size();
     const float c2size = c2->search_size();
+    const float c12size = c1size + c2size;
     const float wl1_maxid = wl1->id_range();
     Frequency *stat1 = wl1->get_stat(frqtype);
     Frequency *stat2 = wl2->get_stat(frqtype);
