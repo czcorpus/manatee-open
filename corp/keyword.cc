@@ -39,6 +39,15 @@ Keyword::Keyword (Corpus *c1, Corpus *c2, WordList *wl1, WordList *wl2, float N,
              vector<string> pos_regex_filters, vector<string> neg_regex_filters, FILE* progress)
             : curr (0), totalcount(0), totalfreq1(0), totalfreq2(0)
 {
+    string str_params(frqtype), ftype, scoretype;
+    int n = str_params.find(";");
+    if (n == -1) {
+        ftype = str_params;
+    } else {
+        ftype = str_params.substr(0, n);
+        scoretype = str_params.substr(n+1);
+    }
+
     vector<regexp_pattern*> pos_regpats;
     for (auto it = pos_regex_filters.begin(); it != pos_regex_filters.end(); it++) {
         if (!(*it).size())
