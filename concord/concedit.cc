@@ -217,7 +217,7 @@ void Concordance::extend_kwic_coll (int collnum)
 
 int custom_rand(int i)
 {
-    return 1697845303 % i;
+    return rand() % i;
 }
 
 
@@ -229,6 +229,7 @@ void Concordance::shuffle()
         for (ConcIndex i=0; i < size(); i++)
             (*view)[i] = i;
     }
+    srand(1109);
     random_shuffle(view->begin(), view->end(), custom_rand);
 }
 
