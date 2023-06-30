@@ -7,11 +7,12 @@ please refer to a respective branch (e.g. `release-2.214.1`).
 
 0. make sure `build-essential`, `libtool`, `autoconf-archive` is installed
 1. clone the repository, make sure all the dependencies are installed (:construction: - list deps)
-2. `autoreconf --install --force`
-3. `configure --with-pcre`
-4. `./make`
-5. `sudo make install`
-6. `sudo ldconfig`
+2.   `libpcre3-dev`
+3. `autoreconf --install --force`
+4. `configure --with-pcre`
+5. `./make`
+6. `sudo make install`
+7. `sudo ldconfig`
 
 ## Available versions
 
