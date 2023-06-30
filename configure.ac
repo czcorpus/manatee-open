@@ -2,7 +2,7 @@
 # Copyright (c) 2003-2023  Pavel Rychly, Milos Jakubicek, Ondrej Herman, Jan Michelfeit
 
 AC_COPYRIGHT([Copyright (c) 2003-2020, Pavel Rychly, Milos Jakubicek, Ondrej Herman, Jan Michelfeit])
-AC_INIT([manatee],[open-2.223.6],[pary@fi.muni.cz])
+AC_INIT([manatee],[open-2.223.6-cnc],[pary@fi.muni.cz])
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR(config)
 AC_CONFIG_SRCDIR(corp/corpus.hh)
@@ -234,7 +234,7 @@ AC_DEFINE_UNQUOTED(VERSION_STR, ["$PACKAGE_VERSION"], [Manatee version number])
 AC_ARG_ENABLE(cxxlib,[AS_HELP_STRING([--enable-cxxlib],[install C++ libraries])],
 [
    case "${enableval}" in
-       yes) cxxlib=true 
+       yes) cxxlib=true
 	AC_DEFINE(CXXLIB, 1, [install C++ libraries])
 	AC_MSG_NOTICE([installation will include C++ libraries])
 	;;
