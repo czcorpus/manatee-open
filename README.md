@@ -9,7 +9,7 @@ please refer to a respective branch (e.g. `release-2.214.1`).
 1. clone the repository, make sure all the dependencies are installed (:construction: - list deps)
 2. `autoreconf --install --force`
 3. `configure --with-pcre`
-4. `make`
+4. `./make`
 5. `sudo make install`
 6. `sudo ldconfig`
 
