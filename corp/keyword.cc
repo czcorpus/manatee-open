@@ -120,19 +120,17 @@ Keyword::Keyword (Corpus *c1, Corpus *c2, WordList *wl1, WordList *wl2, float N,
         double e1 = c1size * (f1 + f2) / c12size;
         double e2 = c2size * (f1 + f2) / c12size;
         freqs[2*addfreqs.size() + 4] = (fpm1 + N) / (fpm2 + N); // default score
-        freqs[2*addfreqs.size() + 5] = 0; // logL score
-        if (f1 != 0) { // x*log(x) = 0 for x -> 0
-            freqs[2*addfreqs.size() + 5] += 2*f1*log(f1/e1);
-        }
-        if (f2 != 0) { // x*log(x) = 0 for x -> 0
-            freqs[2*addfreqs.size() + 5] += 2*f2*log(f2/e2);
-        }
+        freqs[2*addfreqs.size() + 5] = 2 * (f1*log(f1/e1) + f2*log(f2/e2)); // logL score
         freqs[2*addfreqs.size() + 6] = (f1-e1)*(f1-e1)/e1 + (f2-e2)*(f2-e2)/e2; // chi2 score
         freqs[2*addfreqs.size() + 7] = 100 * ((fpm1 - fpm2) / (fpm1 + fpm2)); // DIN size effect
 
         float score;
         if (scoretype == "logL") {
-            score = freqs[2*addfreqs.size() + 5];
+            if (isnan(freqs[2*addfreqs.size() + 5])) {
+                score = 0;
+            } else {
+                score = freqs[2*addfreqs.size() + 5];
+            }
         } else if (scoretype == "chi2") {
             score = freqs[2*addfreqs.size() + 6];
         } else if (scoretype == "din") {
