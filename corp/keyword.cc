@@ -126,7 +126,11 @@ Keyword::Keyword (Corpus *c1, Corpus *c2, WordList *wl1, WordList *wl2, float N,
 
         float score;
         if (scoretype == "logL") {
-            score = freqs[2*addfreqs.size() + 5];
+            if (isnan(freqs[2*addfreqs.size() + 5])) {
+                score = 0;
+            } else {
+                score = freqs[2*addfreqs.size() + 5];
+            }
         } else if (scoretype == "chi2") {
             score = freqs[2*addfreqs.size() + 6];
         } else if (scoretype == "din") {
