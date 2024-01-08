@@ -108,7 +108,7 @@ Keyword::Keyword (Corpus *c1, Corpus *c2, WordList *wl1, WordList *wl2, float N,
         totalfreq2 += f2;
         float fpm1 = f1 * 1000000 / c1size;
         float fpm2 = f2 * 1000000 / c2size;
-        // adding 1 additional field to `freqs`
+        // adding 4 additional fields to `freqs`
         double *freqs = new double[2*addfreqs.size() + 4 + 4];
         freqs[0] = f1; freqs[1] = f2;
         freqs[2] = fpm1; freqs[3] = fpm2;
@@ -119,7 +119,7 @@ Keyword::Keyword (Corpus *c1, Corpus *c2, WordList *wl1, WordList *wl2, float N,
 
         double e1 = c1size * (f1 + f2) / c12size;
         double e2 = c2size * (f1 + f2) / c12size;
-        freqs[2*addfreqs.size() + 4] = (fpm1 + N) / (fpm2 + N); // default score
+        freqs[2*addfreqs.size() + 4] = (fpm1 + N) / (fpm2 + N); // manatee score
         freqs[2*addfreqs.size() + 5] = 2 * (f1*log(f1/e1) + f2*log(f2/e2)); // logL score
         freqs[2*addfreqs.size() + 6] = (f1-e1)*(f1-e1)/e1 + (f2-e2)*(f2-e2)/e2; // chi2 score
         freqs[2*addfreqs.size() + 7] = 100 * ((fpm1 - fpm2) / (fpm1 + fpm2)); // DIN size effect

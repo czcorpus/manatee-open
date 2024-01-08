@@ -19,6 +19,10 @@ struct kwitem {
 class Keyword {
     struct kwitem_cmp {
         bool operator()(const kwitem *a,const kwitem *b) const{
+            if (a->score == b->score) {
+                if (a->freqs[0] == b->freqs[0]) return strcmp(a->str.c_str(), b->str.c_str()) < 0;
+                return a->freqs[0] > b->freqs[0];
+            }
             return a->score > b->score;
         }
     };
