@@ -10,6 +10,7 @@ please refer to a respective branch (e.g. `release-2.223.6`).
    * `libpcre3-dev`
    * `bison`
    * `libltdl`
+   * `swig3.0`
 2. `autoreconf --install --force`
 3. `./configure --with-pcre`
 4. `make`
