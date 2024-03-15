@@ -9,7 +9,7 @@ please refer to a respective branch (e.g. `release-2.223.6`).
 1. clone the repository, make sure all the dependencies are installed (:construction: - list deps):
    * `libpcre3-dev`
    * `bison`
-   * `libltdl`
+   * `libltdl-dev`
    * `swig3.0`
 2. `autoreconf --install --force`
 3. `./configure --with-pcre`
