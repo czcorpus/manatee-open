@@ -5,10 +5,14 @@ please refer to a respective branch (e.g. `release-2.214.1`).
 
 ## How to build
 
-0. make sure `autoconf-archive` is installed
-1. clone the repository, make sure all the dependencies are installed (:construction: - list deps)
+0. make sure  `build-essential`, `libtool`, `autoconf-archive` are installed
+1. clone the repository, make sure all the dependencies are installed (:construction: - list deps):
+   * `libpcre3-dev`
+   * `bison`
+   * `libltdl-dev`
+   * `swig3.0`
 2. `autoreconf --install --force`
-3. `configure --with-pcre`
+3. `./configure --with-pcre`
 4. `make`
 5. `sudo make install`
 6. `sudo ldconfig`
@@ -16,3 +20,4 @@ please refer to a respective branch (e.g. `release-2.214.1`).
 ## Available versions
 
 * [2.214.1](https://github.com/czcorpus/manatee-open/tree/release-2.214.1)
+* [2.223.6](https://github.com/czcorpus/manatee-open/tree/release-2.223.6)
