@@ -1,0 +1,15 @@
+This is Manatee, corpus management and query system.
+
+The doc/ directory contains various documentation for Manatee.
+Users should be aware that:
+
+- Some files might be outdated, freely available 
+  current documentation is available at http://trac.sketchengine.co.uk,
+  installation instructions for the open source version of Manatee
+  are available at http://nlp.fi.muni.cz/trac/noske.
+
+- Some files describe functionality available only in the
+  commercial distribution of Manatee.
+
+- No documentation files affect the licensing conditions which are described
+  solely in the COPYING file.

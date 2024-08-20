@@ -1,0 +1,122 @@
+
+This binary distribution of the Manatee system 
+includes following parts:
+
+GUI:
+  Bonito	graphical user interface (in bonito directory)
+
+Encoding programs:
+  encodevert	creates corpus from vertical texts
+  mkdynattr	creates an index for a dynamic attribute
+  genbgr, mkbgr creates a bigram statistic
+
+Local server:
+  manateesrv	server part of the system
+  corpinfo	displays basic corpus information
+  lsclex        lists a corpus lexicon
+  lscbgr	lists corpus bigrams
+  stddynfun.c	basic dynamic attribute functions source code
+
+Network server:
+  users		empty list of users maintained by chuser command
+  chuser	add or change Manatee user's settings
+  runm.pl	inetd script which tests user access and runs a server
+
+Documentation:
+  README	this file
+  license.txt   Manatee free license
+  corpconf.txt	description of corpus configuration files
+  vertical.txt	description of corpus source format
+  bonito/doc/*	Bonito documentation
+
+
+
+Trying Bonito
+-------------
+You can test Bonito with the SUSANNE corpus without installation of
+any part of the system:
+
+   1. Download susanne-bin.tgz from the www.textforge.cz site to
+      the directory containing this README file.
+
+   2. Type `make test-susanne' to run Bonito.
+
+
+
+Installation
+------------
+Standard `make' command is used for installation.  Edit the beginning 
+of Makefile to change default installation options:
+
+MANATEE_DIR	directory of network server part
+EXEC_DIR	directory for executable files
+BONITO_DIR	Bonito directory
+MANATEE_USER	login name of Manatee server process
+SERVER_PORT	port number of Manatee server service
+SERVER_HOST	default hostname where Bonito connects to
+SERVER_COMMAND	default server command for local Bonito usage
+FROM_NET	default connection type (1 = network, 0 = local)
+SHOW_LICENSE	whether to show license.txt on startup (1) or not (0)
+DEFAULT_LANG	default language of Bonito interface
+MANATEE_REGISTRY	corpus configuration directory
+
+Then use: 
+	
+	make [install-bonito|install-manatee|install-inetd]
+
+to install different parts of the system
+  install-bonito:   Install Bonito only
+  install-manatee:  Install local server part only
+  install-inetd:    Install local and network server
+
+`make install-*' commands may require root permissions depending on
+your system configuration.
+
+
+After server installation you should set the environment variable
+MANATEE_REGISTRY which indicates where the manatee system will find
+corpus configuration files.  e.g. (sh/bash users)
+
+	MANATEE_REGISTRY=/your/path/to/manatee/registry
+	export MANATEE_REGISTRY
+
+or (csh users)
+	setenv MANATEE_REGISTRY /your/path/to/manatee/registry
+
+You can add the above lines to your system-wide shell
+configuration file (/etc/profile, /etc/bashrc, /etc/csh.cshrc, ...)
+
+
+
+Uninstallation
+--------------
+You can uninstall each part of the system by analogous commands:
+	
+	make [uninstall-bonito|uninstall-manatee|uninstall-inetd]
+
+
+
+Bonito Customization
+--------------------
+You can create your own Bonito distribution files corresponding to 
+your configuration (SERVER_HOST, SERVER_PORT, etc.). Use:
+	
+	make [bonito-win.zip|bonito-src.zip|bonito-src.tgz]
+
+bonito-win.zip    Bonito executables for Windows platforms
+bonito-src.zip    Bonito sources in ZIP
+bonito-src.tgz    Bonito sources in tag.gz
+                  You need to install Tcl/Tk version 8.2 or higher 
+		  to run Bonito from sources.
+
+
+
+Corpus Building
+---------------
+You have to write corpus configuration file before corpus building,
+see corpconf.txt for more info and examples.
+
+Use the encodevert command to to build a corpus from  a vertical text.
+     encodevert -c CORPUS_NAME
+See `encodevert -h' for an options listing and examples.
+See vertical.txt for an input format description.

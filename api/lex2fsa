@@ -1,0 +1,19 @@
+#!/bin/bash
+set -euo pipefail
+
+usage()
+{
+	echo "Usage: $0 [-n] PREFIX_TO_LEX_PATH";
+	echo "       -n    do not create .isrt mapping";
+	exit 2;
+}
+
+DO_MKISRT=1
+
+if [ $# -eq 2 ]; then
+	[ $1 == "-n" ] && { DO_MKISRT=0; shift; } || usage;
+elif [ $# -ne 1 ]; then
+	usage;
+fi
+lslex -S $1 | cut -f2- | mkfsa > $1.fsa
+[ $DO_MKISRT == 1 ] && mkisrt $1

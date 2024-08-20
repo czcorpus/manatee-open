@@ -1,0 +1,158 @@
+#!/usr/bin/python3
+#  Copyright (c) 2008-2020  Pavel Rychly, Milos Jakubicek
+
+import sys, os, array, manatee, subprocess
+
+try:
+    import wmap
+    wmapFileAccessError = wmap.FileAccessError
+    wmapAttrNotFound = wmap.AttrNotFound
+except:
+    wmapFileAccessError = manatee.FileAccessError
+    wmapAttrNotFound = manatee.AttrNotFound
+
+stat_names = ["frq", "arf", "docf", "fid", "aldf", "star:f", "token:l"]
+
+def open_corpus():
+    corp = manatee.Corpus(sys.argv[1])
+    if sys.argv[4:]:
+        corp = manatee.SubCorpus (corp, sys.argv[4])
+    return corp
+
+def is_compiled (corp, attr, method):
+    if attr.endswith(".ngr"):
+        if (corp.get_conf("SUBCPATH")):
+            ngr = manatee.NGram (corp.get_conf("PATH") + attr,
+                                 corp.get_conf("SUBCPATH") + attr)
+        else:
+            ngr = manatee.NGram (corp.get_conf("PATH") + attr)
+        attr = ngr.get_wordlist()
+    elif attr == "WSCOLLOC":
+        ws = wmap.WMap (corp.get_conf("WSBASE"), corp)
+        attr = ws.get_wordlist()
+    elif attr == "TERM":
+        termbase = corp.get_conf("TERMBASE")
+        if termbase.endswith("-ws"): # XXX backward compatibility, to be removed
+            termbase = termbase[:-3]
+        attr = corp.get_wordlist (termbase)
+    else:
+        attr = corp.get_attr (attr)
+    try:
+        stat = attr.get_stat(method)
+        sys.stderr.write("%s already compiled, skipping.\n" % method)
+        return True
+    except (manatee.FileAccessError, wmapFileAccessError) as e:
+        return False
+
+def compile_aldf (corp, attr, force):
+    if not force and is_compiled (corp, attr, "aldf"):
+        return
+    sys.stderr.flush()
+    corp.compile_aldf (attr)
+
+def compile_arf (corp, attr, force):
+    if not is_compiled (corp, attr, "frq"):
+        sys.stderr.write("Compiling frq (missing) first\n")
+        compile_frq (corp, attr, False)
+        corp = open_corpus() # must reopen freq files
+    if not force and is_compiled (corp, attr, "arf"):
+        return
+    sys.stderr.flush()
+    corp.compile_arf (attr)
+
+def compile_frq (corp, attr, force):
+    if not force and is_compiled (corp, attr, "frq"):
+        return
+    sys.stderr.flush()
+    corp.compile_frq (attr)
+
+def compile_fid (corp, attr, force):
+    if not is_compiled (corp, attr, "frq"):
+        sys.stderr.write("Compiling frq (missing) first\n")
+        compile_frq (corp, attr, False)
+        corp = open_corpus() # must reopen freq files
+    attr = corp.get_attr (attr)
+    freqs = [attr.freq(i) for i in range(attr.id_range())]
+    frqids = zip (freqs, range(len(freqs)))
+    frqids.sort(reverse=True)
+    fidfile = "%s%s.fid" % (corp.get_conf("SUBCPATH") or corp.get_conf("PATH"),
+                            attr.name)
+    outfid = array.array('i', [i for (f, i) in frqids])
+    outfid.tofile (open (fidfile + '.tmp', 'wb'))
+    os.rename (fidfile + '.tmp', fidfile)
+
+def compile_docf (corp, attr, force):
+    if not force and is_compiled (corp, attr, "docf"):
+        return
+    doc_struc = corp.get_conf("DOCSTRUCTURE")
+    try:
+        doc = corp.get_struct(doc_struc)
+    except (manatee.AttrNotFound, wmapAttrNotFound):
+        sys.stderr.write ("No \"%s\" structure (DOCSTRUCTURE) available.\
+            Can't compile document freqs for %s." % (doc_struc, attr))
+        return
+    sys.stderr.flush()
+    corp.compile_docf (attr, doc.name)
+
+def compile_star (corp, attr, force):
+    if not force and is_compiled (corp, attr, "star:f"):
+        return
+    doc_struc = corp.get_conf("DOCSTRUCTURE")
+    try:
+        doc = corp.get_struct(doc_struc)
+    except (manatee.AttrNotFound, wmapAttrNotFound):
+        sys.stderr.write ("No \"%s\" structure (DOCSTRUCTURE) available.\
+            Can't compile star ratings for %s." % (doc_struc, attr))
+        return
+    star_attr = corp.get_conf("STARATTR")
+    try:
+        star = doc.get_attr(star_attr)
+    except (manatee.AttrNotFound, wmapAttrNotFound):
+        sys.stderr.write ("No \"%s\" structure attribute (STARATTR) available.\
+            Can't compile star ratings for %s." % (star_attr, attr))
+        return
+    sys.stderr.flush()
+    corp.compile_star (attr, doc.name, star_attr)
+
+def compile_token (corp, attr, force):
+    if not "." in attr:
+        sys.stderr.write ("Invalid attribute given for .token file (%s) -- only\
+            structure attributes allowed." % attr)
+        return
+    if not force and is_compiled (corp, attr, "token:l"):
+        return
+    struc, attr = attr.split(".")
+    subcpath = corp.get_conf("SUBCPATH")
+    subprocess.run(["mktokencov", corp.get_confpath(), struc, attr] +
+        (['-s', subcpath + 'subc'] if subcpath else []), check=True)
+
+def usage():
+    print("""Usage: mkstats [-f] CORPNAME ATTR STAT [ SUBCORP_FILE ]
+Compiles the given statistics for an attribute
+CORPNAME      corpus configuration file
+ATTR          attribute name (append .ngr for n-grams)
+STAT          statistics to be compiled, may be one of: {}
+SUBCORP_FILE  subcorpus (.subc) file
+ -f           force recalculation of existing statistics"""\
+         .format(', '.join (stat_names)), file=sys.stderr)
+    sys.exit(1)
+
+if __name__ == "__main__":
+    force = '-f' in sys.argv
+    if force:
+        del sys.argv[sys.argv.index('-f')]
+    if sys.argv[3:]:
+        corp = open_corpus()
+        attr = sys.argv[2]
+        stat = sys.argv[3]
+        if stat not in stat_names:
+            sys.stderr.write ("Invalid statistics name: %s\n" % stat)
+            sys.stderr.write ("Valid names are: %s\n" % ",".join (stat_names))
+            usage()
+        sys.stderr.write("Compiling %s for attribute %s\n" % (stat, attr))
+        sys.stderr.flush()
+        globals()["compile_" + stat.rsplit(":",1)[0]] (corp, attr, force)
+    else:
+        usage()
+
+# vim: ts=4 sw=4 sta et sts=4 si cindent tw=80:

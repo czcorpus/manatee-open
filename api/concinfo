@@ -1,0 +1,71 @@
+#!/usr/bin/python3
+# Copyright (c) 2006-2009  Pavel Rychly
+from __future__ import print_function
+from __future__ import unicode_literals
+
+"""
+Prints concordance info: 
+   frequency of different linegroups and optionally annotated hits
+"""
+import sys
+import manatee
+
+def toks2str (tokens):
+    return ' '.join ([x for i,x in enumerate(tokens) if i % 2 == 0])
+
+def print_conc_lines (corp, conc, labels):
+    kl = manatee.KWICLines (corp, conc.RS(), '-1:s', '1:s', 'word', 'word', '', '')
+    for line in range (conc.size()):
+        if not kl.nextline ():
+            break
+        if kl.get_linegroup():
+            print('#%d [%s] %s <%s> %s' % (kl.get_pos(), 
+                                           labels[kl.get_linegroup()],
+                                           toks2str(kl.get_left()),
+                                           toks2str(kl.get_kwic()).strip(),
+                                           toks2str(kl.get_right()).strip()))
+
+def print_conc_info (corp, concfile, printlines=False, reducelines=None):
+    conc = manatee.Concordance()
+    conc.load_from_file (corp, concfile)
+    if reducelines:
+        conc.reduce_lines(reducelines)
+    ids = manatee.IntVector()
+    freqs = manatee.IntVector()
+    conc.get_linegroup_stat (ids, freqs)
+    if len(ids) == 0:
+        print('%s\tNone' % concfile)
+        return
+
+    try:
+        labels = {0:'None'}
+        from xml.etree.ElementTree import parse
+        for e in parse(concfile[:-5] + '.info').find('labels'):
+            labels[int(e.find('n').text)] = e.find('lab').text
+    except:
+        labels = dict([(i,str(i)) for i in ids])
+
+    print(concfile, ': ', conc.size())
+    for id, freq in zip(ids, freqs):
+        print('\t%s\t%d' % (labels[id], freq))
+    if printlines:
+        print_conc_lines (corp, conc, labels)
+                                          
+
+
+if __name__ == "__main__":
+    if sys.argv[2:]:
+        if sys.argv[1] == '-l':
+            printlines = True
+            del sys.argv[1]
+        else:
+            printlines = False
+        reducelines = 0
+        if sys.argv[1] == '-r':
+            reducelines = sys.argv[2]
+            del sys.argv[1:2]
+        corp = manatee.Corpus (sys.argv[1])
+        for f in sys.argv[2:]:
+            print_conc_info (corp, f, printlines, reducelines)
+    else:
+        print("usage: concinfo.py [-l] [-r CONCSIZE] CORPNAME CONCFILE [CONCFILES]")

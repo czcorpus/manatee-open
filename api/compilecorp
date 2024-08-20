@@ -1,0 +1,978 @@
+#!/bin/bash -e
+# Copyright 2007-2022  Jan Pomikalek, Milos Jakubicek
+
+set -o pipefail
+set -o errtrace
+
+eecho() {
+    echo "$@" >&2
+}
+
+CURRTIME="eval date '+[%Y%m%d-%H:%M:%S]'"
+parcmd() {
+    echo "echo \`$CURRTIME\` === parallel output and job begin for cmd: $@ >&2; \
+          $@; \
+          echo \`$CURRTIME\` === output and job end >&2"
+}
+
+checkprogram()
+{
+    PROGRAM="$1"
+    HINT="$2"
+    FALLBACK="$3"
+    if which "$PROGRAM" >/dev/null 2>/dev/null; then
+        return 0
+    else
+        if [ $3 ]; then
+            eecho "$THIS: $PROGRAM not found, falling back to $3"
+            return 0
+        else
+            eecho "$THIS: $PROGRAM not found; please make sure it's in your PATH variable" $HINT
+            return 1
+        fi
+    fi
+}
+
+array_implode(){
+    saveIFS=$IFS
+    IFS="$2"
+    eval "$3=(\$1)"
+    IFS=$saveIFS
+}
+
+trap 'traperror $? $LINENO $BASH_LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]})'  ERR
+
+# thanks to Hilario J. Montoliu <hmontoliu@gmail.com>, traperror licenced under GPLv2 or later.
+# http://stackoverflow.com/questions/6928946/mysterious-lineno-in-bash-trap-err
+traperror () 
+{
+    local err=$1 # error status
+    local line=$2 # LINENO
+    local linecallfunc=$3
+    local command="$4"
+    local funcstack="$5"
+    eecho "<---"
+    eecho "ERROR: line $line - command '$command' exited with status: $err"
+    if [ "$funcstack" != "::" ]; then
+        eecho -n "   ... Error at ${funcstack} "
+        if [ "$linecallfunc" != "" ]; then
+            eecho -n "called at line $linecallfunc"
+        fi
+        else
+            eecho -n "   ... internal debug info from function ${FUNCNAME} (line $linecallfunc)"
+    fi
+    eecho
+    eecho "--->"
+    cleanuplog $err
+}
+
+cleanuplog()
+{
+    if [ -f "$LOGFILEPATH" ]; then
+        LOGFILE="`cat "$LOGFILEPATH"`"
+        eecho "Writing log to $LOGFILE"
+        if mkdir -p "`dirname "$LOGFILE"`"; then
+            mv "$TMPLOGFILE" "$LOGFILE"
+        fi
+    fi
+
+    rm -f "$TMPLOGFILE" "$LOGFILEPATH"
+    exit $1
+}
+
+main() 
+{
+    CPUS=1
+    USAGE="Usage: $THIS [OPTIONS] CORPNAME [FILENAME]
+Creates a new corpus from a vertical text in file FILENAME or stdin.
+If possible, also creates word sketches, thesaurus, histograms and
+subcorpora. Existing components are never overwritten unless recompiling is
+explicitly requested.
+
+    --recompile-corpus      recompile the corpus and all its components
+                            (vertical file must be available, implies
+                            --recompile-sizes)
+    --recompile-sketches    recompile word sketches, thesaurus and histograms 
+                            (implies --recompile-thesaurus
+                            --recompile-histograms)
+    --recompile-terms       recompile terms
+    --replace-terms         atomically recompile terms
+                            (requires double space during compilation)
+
+    --recompile-thesaurus   recompile thesaurus
+    --recompile-histograms  recompile histograms
+    --recompile-subcorpora  recompile subcorpora
+    --recompile-sizes       recompile sizes statistics
+    --recompile-align       recompile alignments to parallel corpora
+    --recompile-bidicts     recompile bilingual dictionaries to parallel corpora
+    --recompile-biterms     recompile bilingual terminology from parallel corpora
+    --recompile-trends      recompile trends (diachronic analysis)
+    --recompile-lcm         recompile longest commonest match
+
+    --no-ske                disable all features unavailable in NoSketch Engine
+    --no-check              do not run corpcheck at the end
+    --no-sketches           do not compile word sketches
+                            (implies --no-thesaurus --no-histograms)
+    --no-terms              do not compile word sketch terms
+    --no-thesaurus          do not compile thesaurus
+    --no-histograms         do not compile histograms
+    --no-subcorpora         do not compile subcorpora
+    --no-sizes              do not compile sizes
+    --no-align              do not compile alignment to parallel corpora
+    --no-alignsizes         do not compile aligned part sizes
+    --do-bidicts            compile bilingual dictionaries from parallel corpora
+    --no-biterms            do not compile bilingual terminology from parallel corpora
+    --no-trends             do not compile trends (diachronic analysis)
+    --no-lcm                do not compile longest commonest match
+    --no-parallel           do not parallelize processing (this is the default)
+    --parallel=N            use maximum N jobs for parallelization
+    --lexicon-cache=BYTES   use at most BYTES of memory when encoding lexicons
+
+    -h, --help              print this info"
+
+    RECOMPILE_CORPUS=0
+    RECOMPILE_SKETCHES=0
+    RECOMPILE_TERMS=0
+    REPLACE_TERMS=0
+    RECOMPILE_HASHWS=0
+    RECOMPILE_THESAURUS=0
+    RECOMPILE_HISTOGRAMS=0
+    RECOMPILE_SUBCORPORA=0
+    RECOMPILE_SIZES=0
+    RECOMPILE_ALIGN=0
+    RECOMPILE_BIDICTS=0
+    RECOMPILE_BITERMS=0
+    RECOMPILE_TRENDS=0
+    RECOMPILE_LCM=0
+
+    NO_SKE=1
+    NO_HASHWS=0
+    NO_SKETCHES=0
+    NO_THESAURUS=0
+    NO_HISTOGRAMS=0
+    NO_SUBCORPORA=0
+    NO_SIZES=0
+    NO_PARALLEL=1
+    DO_BIDICTS=0
+    NO_BITERMS=0
+    NO_ALIGN=0
+    NO_ALIGNSIZES=0
+    NO_TERMS=0
+    NO_TRENDS=0
+    NO_LCM=0
+    NO_CHECK=0
+    LEXICON_CACHE=0
+
+    OPTS=`getopt -n $THIS -o h -l help,recompile-corpus,recompile-sketches,\
+recompile-thesaurus,recompile-histograms,recompile-subcorpora,recompile-sizes,\
+recompile-align,recompile-terms,replace-terms,recompile-bidicts,\
+recompile-biterms,recompile-trends,recompile-lcm,no-sketches,\
+no-thesaurus,no-histograms,no-subcorpora,no-sizes,no-parallel,no-align,\
+no-alignsizes,do-bidicts,no-biterms,no-terms,no-trends,no-lcm,no-check,\
+parallel::,lexicon-cache: \
+-- "$@"`|| return 1
+
+    eval set -- "$OPTS"
+
+    while true; do
+         case $1 in
+             --recompile-corpus)     RECOMPILE_CORPUS=1;
+                                     RECOMPILE_SIZES=1;
+                                     shift;;
+             --recompile-sketches)   RECOMPILE_SKETCHES=1;
+                                     RECOMPILE_THESAURUS=1; 
+                                     RECOMPILE_HISTOGRAMS=1; 
+                                     shift;;
+             --recompile-terms)      RECOMPILE_TERMS=1; shift;;
+             --replace-terms)        REPLACE_TERMS=1; shift;;
+             --recompile-thesaurus)  RECOMPILE_THESAURUS=1; shift;;
+             --recompile-histograms) RECOMPILE_HISTOGRAMS=1; shift;;
+             --recompile-subcorpora) RECOMPILE_SUBCORPORA=1; shift;;
+             --recompile-sizes)      RECOMPILE_SIZES=1; shift;;
+             --recompile-align)      RECOMPILE_ALIGN=1; shift;;
+             --recompile-bidicts)    RECOMPILE_BIDICTS=1; DO_BIDICTS=1; shift;;
+             --recompile-biterms)    RECOMPILE_BITERMS=1; shift;;
+             --recompile-trends)     RECOMPILE_TRENDS=1; shift;;
+             --recompile-lcm)        RECOMPILE_LCM=1; shift;;
+             --no-ske)        NO_SKE=1; shift;;
+             --no-sketches)   NO_SKETCHES=1;
+                              NO_THESAURUS=1;
+                              NO_HISTOGRAMS=1;
+                              shift;;
+             --no-terms)      NO_TERMS=1; shift;;
+             --no-thesaurus)  NO_THESAURUS=1; shift;;
+             --no-histograms) NO_HISTOGRAMS=1; shift;;
+             --no-subcorpora) NO_SUBCORPORA=1; shift;;
+             --no-sizes)      NO_SIZES=1; shift;;
+             --no-parallel)   NO_PARALLEL=1; shift;;
+             --parallel)      CPUS=${2:-`nproc`}; NO_PARALLEL=0; shift 2;;
+             --lexicon-cache) LEXICON_CACHE=$2; shift 2;;
+             --no-align)      NO_ALIGN=1; NO_ALIGNSIZES=1; shift;;
+             --no-alignsizes) NO_ALIGNSIZES=1; shift;;
+             --do-bidicts)    DO_BIDICTS=1; shift;;
+             --no-biterms)    NO_BITERMS=1; shift;;
+             --no-trends)     NO_TRENDS=1; shift;;
+             --no-lcm)        NO_LCM=1; shift;;
+             --no-check)      NO_CHECK=1; shift;;
+             -h|--help) echo "$USAGE"; return 0;;
+             --) shift; break;;
+             *) echo "Internal error!"; return 1;;
+         esac
+    done
+
+    if [ $# = 0 -o $# -gt 2 ]; then
+        eecho "$USAGE"
+        [ $# = 0 ] && return 0 || return 1
+    fi
+
+    if ! [ "$CPUS" -gt 0 ] 2>/dev/null; then
+        eecho "Invalid number of parallel jobs to be run: '$CPUS'"
+        eecho "Assuming '--parallel=1' instead"
+        CPUS=1
+    fi
+
+    if [ $NO_SKE = 1 ]; then
+        NO_HASHWS=1;
+        NO_SKETCHES=1;
+        NO_THESAURUS=1;
+        NO_HISTOGRAMS=1;
+        NO_TERMS=1;
+        NO_BITERMS=1;
+        NO_TRENDS=1;
+        NO_LCM=1;
+    fi
+
+    # check if required programs are available
+    checkprogram encodevert
+    checkprogram corpinfo
+    checkprogram mksubc
+    checkprogram mkstats
+    checkprogram mktokencov
+    if [ $NO_SKETCHES = 0 ]; then
+        HINT="or use --no-sketches"
+        checkprogram genws "$HINT"
+        checkprogram virtws "$HINT"
+        checkprogram mkwmap "$HINT"
+        checkprogram mkwmrank "$HINT"
+        checkprogram sconll2sketch "$HINT"
+        checkprogram sconll2wmap "$HINT"
+        checkprogram m4 "$HINT"
+    fi
+    if [ $NO_TERMS = 0 ]; then
+        HINT="or use --no-terms"
+        checkprogram genterms "$HINT"
+        checkprogram mkdrev "$HINT"
+    fi
+    if [ $NO_THESAURUS = 0 ]; then
+        HINT="or use --no-thesaurus"
+        checkprogram wm2thes "$HINT"
+        checkprogram mkthes "$HINT"
+    fi
+    if [ $NO_HISTOGRAMS = 0 ]; then
+        HINT="or use --no-histograms"
+        checkprogram genhist "$HINT"
+    fi
+    if [ $NO_SIZES = 0 ]; then
+        HINT="or use --no-sizes"
+        checkprogram mkwc "$HINT"
+    fi
+    if [ $NO_ALIGN = 0 ]; then
+        HINT="or use --no-align"
+        checkprogram mkalign "$HINT"
+    fi
+    if [ $DO_BIDICTS = 1 ]; then
+        HINT="or omit --do-bidicts"
+        checkprogram par2tokens "$HINT"
+        checkprogram mkbidict "$HINT"
+        checkprogram lsbgr "$HINT"
+        checkprogram mkbgr "$HINT"
+        checkprogram tokens2dict "$HINT"
+    fi
+    if [ $NO_BITERMS = 0 ]; then
+        HINT="or use --no-biterms"
+        checkprogram biterms "$HINT"
+    fi
+    if [ $NO_TRENDS = 0 ]; then
+        HINT="or use --no-trends"
+        checkprogram mktrends "$HINT"
+    fi
+    if [ $NO_PARALLEL = 0 ]; then
+        HINT="or use --no-parallel"
+        checkprogram parallel "$HINT"
+    fi
+    if [ $NO_LCM = 0 ]; then
+        HINT="or use --no-lcm"
+        checkprogram ske "$HINT" mklcm
+        checkprogram dumpws "$HINT"
+        checkprogram mkwmrank "$HINT"
+    fi
+    if [ $NO_CHECK = 0 ]; then
+        HINT="or use --no-check"
+        checkprogram corpcheck "$HINT"
+    fi
+
+    CORPUS="$1"
+    INPUT_FILE="$2"
+
+    # check whether the corpus exists
+    corpinfo "$CORPUS" >/dev/null
+
+    MANATEE_VERSION=`corpinfo -v`
+    eecho "Manatee version: $MANATEE_VERSION"
+
+    eecho "Reading corpus configuration..."
+    PATH_="`corpinfo -p "$CORPUS"`"
+    VERTICAL="`corpinfo -g VERTICAL "$CORPUS"`"
+    WSDEF="`corpinfo -g WSDEF "$CORPUS"`"
+    WSHIST="`corpinfo -g WSHIST "$CORPUS"`"
+    SUBCDEF="`corpinfo -g SUBCDEF "$CORPUS"`"
+    WSBASE="`corpinfo -g WSBASE "$CORPUS"`"
+    WSATTR="`corpinfo -g WSATTR "$CORPUS"`"
+    WSTHES="`corpinfo -g WSTHES "$CORPUS"`"
+    WSMINHITS="`corpinfo -g WSMINHITS "$CORPUS"`"
+    WSOLDSCORES="`corpinfo -g WSOLDSCORES "$CORPUS"`"
+    ALIGNDEF="`corpinfo -g ALIGNDEF "$CORPUS"`"
+    ALIGNED="`corpinfo -g ALIGNED "$CORPUS"`"
+    VIRTUAL="`corpinfo -g VIRTUAL "$CORPUS"`"
+    TERMDEF="`corpinfo -g TERMDEF "$CORPUS"`"
+    TERMBASE="`corpinfo -g TERMBASE "$CORPUS"`"
+    REFCORPUS="`corpinfo -g REFCORPUS "$CORPUS"`"
+    ATTRLIST="`corpinfo -g ATTRLIST "$CORPUS"`"
+    DIACHRONIC="`corpinfo -g DIACHRONIC "$CORPUS"`"
+    DIAPOSATTRS="`corpinfo -g DIAPOSATTRS "$CORPUS"`"
+    SUBCBASE="`corpinfo -g SUBCBASE "$CORPUS"`"
+    STARATTR="`corpinfo -g STARATTR "$CORPUS"`"
+
+    # print settings
+    eecho "PATH=$PATH_"
+    eecho "VERTICAL=$VERTICAL"
+    eecho "WSDEF=$WSDEF"
+    eecho "WSHIST=$WSHIST"
+    eecho "SUBCDEF=$SUBCDEF"
+    eecho "WSBASE=$WSBASE"
+    eecho "WSATTR=$WSATTR"
+    eecho "WSTHES=$WSTHES"
+    eecho "WSMINHITS=$WSMINHITS"
+    eecho "WSOLDSCORES=$WSOLDSCORES"
+    eecho "ALIGNDEF=$ALIGNDEF"
+    eecho "ALIGNED=$ALIGNED"
+    eecho "TERMDEF=$TERMDEF"
+    eecho "TERMBASE=$TERMBASE"
+    eecho "REFCORPUS=$REFCORPUS"
+    eecho "ATTRLIST=$ATTRLIST"
+    eecho "DIACHRONIC=$DIACHRONIC"
+    eecho "DIAPOSATTRS=$DIAPOSATTRS"
+    eecho "SUBCBASE=$SUBCBASE"
+
+    # create and store log filepath
+    PATH_="`corpinfo -p "$CORPUS"`"
+
+    if [ -z "${PATH_}" ]; then
+        eecho "$THIS: corpus PATH needs to be set" >&2
+        return 1
+    fi
+
+    DATETIME=`date "+%Y-%m-%d_%H%M"`
+    LOGFILE="${PATH_}log/${THIS}_$DATETIME.log"
+    echo "$LOGFILE" > "$LOGFILEPATH"
+
+    # CORPUS ###################################################################
+
+    # check whether the corpus is compiled
+    PRIMARYATTR=`corpinfo -g word.TYPE $CORPUS >&/dev/null && echo word || corpinfo -g DEFAULTATTR $CORPUS`
+    COMPILED_FILE="$PATH_/$PRIMARYATTR".lex
+    CORPUS_COMPILED=0
+    test -e "$COMPILED_FILE" && CORPUS_COMPILED=1
+
+    test $CORPUS_COMPILED = 1 && eecho "Corpus is compiled"
+
+    if [ -n "$INPUT_FILE" -a $CORPUS_COMPILED = 1 -a $RECOMPILE_CORPUS = 0 ]; then
+        eecho "$THIS: corpus $CORPUS is already compiled; use --recompile-corpus to recompile" >&2
+        return 1
+    fi
+
+    if [ $CORPUS_COMPILED = 1 -a $RECOMPILE_CORPUS = 0 -a \
+            "$VERTICAL" -nt "$COMPILED_FILE" ]; then
+        eecho "$THIS: warning: VERTICAL file is newer than compiled data; use --recompile-corpus to recompile" >&2
+    fi
+
+    CORPUS_LOGDIR="$PATH_""log"
+    LOGDIR_BACKUP="$TMPDIR/$THIS-log-backup-$$"
+    if [ $CORPUS_COMPILED = 0 -o $RECOMPILE_CORPUS = 1 ]; then
+        if [ "$VIRTUAL" ]; then
+            eecho "This is a virtual corpus with configuration from: $VIRTUAL"
+        else
+            eecho -n "Vertical text will be read from "
+            if [ -n "$INPUT_FILE" ]; then
+                if [ "$INPUT_FILE" = "-" ]; then
+                    eecho "standard input"
+                else
+                    eecho $INPUT_FILE
+                fi
+            else
+                if [ -n "$VERTICAL" ]; then
+                    eecho $VERTICAL
+                else
+                    eecho "standard input"
+                fi
+            fi
+        fi
+
+        # (re)compile corpus
+        if [ $RECOMPILE_CORPUS = 1 ]; then
+            # back-up log
+            if [ -d "$CORPUS_LOGDIR" ]; then
+                eecho "Backing-up log directory to $LOGDIR_BACKUP"
+                mv "$CORPUS_LOGDIR" "$LOGDIR_BACKUP"
+            fi
+            # delete corpus
+            eecho "Deleting corpus PATH directory..."
+            RMPATH_ERROR=0
+            rm -rf "$PATH_/"* || RMPATH_ERROR=1
+            # restore log
+            if [ -d "$LOGDIR_BACKUP" ]; then
+                eecho "Restoring log directory..."
+                mv "$LOGDIR_BACKUP" "$CORPUS_LOGDIR"
+            fi
+            test $RMPATH_ERROR = 1 && return 1
+        fi
+        eecho "Compiling corpus..."
+        if [ "$VIRTUAL" ]; then
+            if grep -1q ',[0-9]\+\s*$\|^0*[1-9][0-9]*,' "$VIRTUAL"; then
+                mkvirt "$CORPUS"  # some segments are partial
+            else
+                mkvirt -n "$CORPUS"  # do not prune lexicons
+            fi
+        elif [ $NO_PARALLEL = 1 ]; then
+            encodevert -m $LEXICON_CACHE -c "$@"
+        else
+            parencodevert -m $LEXICON_CACHE -j $CPUS -t $TMPDIR "$CORPUS"
+        fi
+        eecho "Compiling frequencies..."
+        if [ $NO_PARALLEL = 1 ]; then
+            for ATTR in `echo $ATTRLIST | tr "," " "`; do
+                for STAT in arf docf aldf; do
+                    mkstats "$CORPUS" $ATTR $STAT
+                done
+                [ $STARATTR ] && mkstats "$CORPUS" $ATTR star:f
+            done
+        else
+            for ATTR in `echo $ATTRLIST | tr "," " "`; do
+                for STAT in arf docf aldf; do
+                    parcmd mkstats "$CORPUS" $ATTR $STAT
+                done
+                [ $STARATTR ] && echo mkstats "$CORPUS" $ATTR star:f || :
+            done | parallel --halt 2 --gnu --tmpdir "$TMPDIR" -j $CPUS
+        fi
+        eecho "Compiling structure coverage..."
+        mktokencov "$CORPUS"
+        CORPUS_COMPILED=1
+    fi
+
+    # SIZES ################################################################
+
+    SIZES_COMPILED=0
+    COMPILED_SIZES_FILE="$PATH_"/sizes
+    if [ $CORPUS_COMPILED = 1 ]; then
+        [ -f $COMPILED_SIZES_FILE ] && SIZES_COMPILED=1
+    fi
+
+    if [ $NO_SIZES = 1 ]; then
+        eecho "Compiling sizes disabled; skipping..."
+    elif [ $CORPUS_COMPILED = 0 ]; then
+        eecho "Corpus is not compiled; skipping sizes..."
+    else
+        COMPILE_SIZES=0
+        if [ $SIZES_COMPILED = 1 ]; then
+            eecho "Sizes are compiled"
+            if [ $RECOMPILE_SIZES = 1 ]; then
+                eecho "Deleting existing sizes..."
+                rm -f $COMPILED_SIZES_FILE
+                COMPILE_SIZES=1
+            fi
+        else
+            COMPILE_SIZES=1
+        fi
+
+        if [ $COMPILE_SIZES = 1 ]; then
+            if [ $NO_ALIGNSIZES = 1 ]; then
+                mksizes "$CORPUS" --no-alignsizes
+            else
+                mksizes "$CORPUS"
+            fi
+        fi
+    fi
+
+    # SUBCORPORA ################################################################
+
+    if [ $NO_SUBCORPORA = 1 ]; then
+        eecho "Compiling subcorpora disabled; skipping..."
+    elif [ $CORPUS_COMPILED = 0 ]; then
+        eecho "Corpus is not compiled; skipping subcorpora..."
+    elif [ -z "$SUBCDEF" ]; then
+        eecho "SUBCDEF path not specified in the configuration file; skipping subcorpora..."
+    else
+        if [ $RECOMPILE_SUBCORPORA = 1 ]; then
+            eecho "Deleting existing subcorpora..."
+            rm -rf "$SUBCBASE"
+        fi
+        eecho "Compiling subcorpora..."
+        if [ $NO_PARALLEL = 1 ]; then
+            mksubc -s frq,arf,docf,aldf "$CORPUS" "$SUBCBASE" "$SUBCDEF"
+        else
+            mkdir -p "$SUBCBASE"
+            mksubc -S frq,arf,docf,aldf "$CORPUS" "$SUBCBASE" "$SUBCDEF" > "$SUBCBASE/Makefile.subcorpora"
+            make -C "$SUBCBASE" -f Makefile.subcorpora -Otarget -j $CPUS
+        fi
+    fi
+
+    # WORD SKETCHES ############################################################
+        
+    SKETCHES_COMPILED=0
+    COMPILED_WS_FILE="$WSBASE.lex"
+    if [ -e "$COMPILED_WS_FILE" ]; then
+        SKETCHES_COMPILED=1
+    fi
+
+    if [ $NO_SKETCHES = 1 ]; then
+        eecho "Compiling word sketches disabled; skipping..."
+    elif [ -z "$WSDEF" ]; then
+        eecho "WSDEF attribute is not set; skipping word sketches..."
+    else
+        COMPILE_SKETCHES=0
+        if [ $SKETCHES_COMPILED = 1 ]; then
+            eecho "Word sketches are compiled"
+            if [ $RECOMPILE_SKETCHES = 1 ]; then
+                eecho "Deleting existing sketches..."
+                rm -f "$WSBASE"#*.* "$WSBASE".*
+                COMPILE_SKETCHES=1
+            else
+                if [ "$WSDEF" -nt "$COMPILED_WS_FILE" ]; then
+                    eecho "$THIS: warning: WSDEF file is newer than compiled sketches; use --recompile-sketches to recompile" >&2
+                fi
+            fi
+        else
+            COMPILE_SKETCHES=1
+        fi
+
+        if [ $COMPILE_SKETCHES = 1 ]; then
+            eecho "Compiling sketches..."
+
+            if [ ${WSDEF##*.} = conll ]; then
+                sconll2sketch "$CORPUS"
+            else
+                # expand m4 macros
+                if [ ${WSDEF##*.} = m4 ]; then
+                    eecho "Expanding m4 macros in $WSDEF"
+                    TMPWSDEF=$TMPDIR/$THIS-wsdef.$$
+                    m4 "$WSDEF" > "$TMPWSDEF" || { rm -f "$TMPWSDEF"; return 1; }
+                    WSDEF="$TMPWSDEF"
+                fi
+                eecho "Using word sketch definitions from $WSDEF"
+                # virtualizing wmap only works only when all segments map to whole corpora
+                if [ "$VIRTUAL" ] && (! grep -1q ',[0-9]\+\s*$\|^0*[1-9][0-9]*,' "$VIRTUAL"); then
+                    virtws "$CORPUS"
+                else
+                    if [ $NO_PARALLEL = 1 ]; then
+                       genws -p "$CORPUS" "$WSATTR" "$WSBASE" "$WSDEF" | mkwmap -f $WSMINHITS "$WSBASE"
+                    else
+                        parws "$CORPUS" "$WSDEF" "$WSBASE" "$CPUS"
+                    fi
+                    if [ -n "$WSOLDSCORES" ]; then
+                        mkwmrank -o "$WSBASE"
+                    else
+                        mkwmrank "$WSBASE"
+                    fi
+                fi
+
+                # remove TMPWSDEF
+                rm -f "$TMPWSDEF"
+            fi
+            eecho "Compiling word sketch FSA"
+            sortws "$CORPUS" | mkfsa > "$WSBASE".wl.fsa
+
+            # cache will get cleared
+            touch "$PATH_/$PRIMARYATTR".lex
+
+            SKETCHES_COMPILED=1
+        fi
+    fi
+
+    # LCM ######################################################################
+
+    if [ $NO_LCM = 1 ]; then
+        eecho "Compiling longest commonest match disabled; skipping..."
+    elif [ $SKETCHES_COMPILED = 0 ]; then
+        eecho "Word sketches not compiled; skipping longest commonest match..."
+    elif [ "$VIRTUAL" ]; then
+        eecho "Corpus is virtual; skipping..."
+    elif [ ! -f "${WSBASE}.map0.com" ]; then
+        eecho "Word sketch format does not support longest commonest match, use --recompile-sketches to be able to compile it; now skipping..."
+    else
+        LCM_COMPILED=0
+        set +o pipefail
+        if dumpws $CORPUS 2>/dev/null | head -1 | grep -q -v "LCM NOT COMPILED"; then
+            eecho "Longest commonest match is compiled."
+            LCM_COMPILED=1
+        fi
+        set -o pipefail
+        if [ $LCM_COMPILED = 0 -o $RECOMPILE_LCM = 1 ]; then
+            eecho "Compiling longest commonest match..."
+            ske mklcm -c $CORPUS -j "$CPUS" > "$WSBASE".lcm
+            eecho "Compiling frequent text types..."
+            ske mkftt -c $CORPUS -j "$CPUS" > "$WSBASE".ftt
+            if [ -n "$WSOLDSCORES" ]; then
+                mkwmrank -o "$WSBASE" -c "$WSBASE".lcm -t "$WSBASE".ftt
+            else
+                mkwmrank "$WSBASE" -c "$WSBASE".lcm -t "$WSBASE".ftt
+            fi
+            rm "$WSBASE".lcm "$WSBASE".ftt
+            eecho "...finished compiling longest commonest match."
+            eecho "Compiling word sketch FSA"
+            sortws "$CORPUS" | mkfsa > "$WSBASE".wl.fsa
+        fi
+    fi
+
+    # TERMS ####################################################################
+
+    TERMS_COMPILED=0
+    COMPILED_TERMS_FILE="$TERMBASE.fsa"
+    if [ -e "$COMPILED_TERMS_FILE" ]; then
+        TERMS_COMPILED=1
+    fi
+
+    if [ $NO_TERMS = 1 ]; then
+        eecho "Compiling terms disabled; skipping..."
+    elif [ -z "$TERMDEF" ]; then
+        eecho "TERMDEF attribute is not set; skipping terms..."
+    else
+        COMPILE_TERMS=0
+        if [ $TERMS_COMPILED = 1 ]; then
+            eecho "Terms are compiled"
+            if [ $RECOMPILE_TERMS = 1 ]; then
+                eecho "Deleting existing terms..."
+                rm -f "$TERMBASE"#*.* "$TERMBASE".*
+                COMPILE_TERMS=1
+            elif [ $REPLACE_TERMS = 1 ]; then
+                eecho "Existing terms will be atomically replaced at the end of the compilation..."
+                TERMDIR="`dirname $TERMBASE`"
+                eecho TERMDIR=$TERMDIR
+                TERMTMPDIR="`mktemp -d -p $TERMDIR COMPILETERMS.XXXXXXX`"
+                ORIGTERMBASE="$TERMBASE"
+                TERMBASE="$TERMTMPDIR/`basename $TERMBASE`"
+                COMPILE_TERMS=1
+            else
+                if [ "$TERMDEF" -nt "$COMPILED_TERMS_FILE" ]; then
+                    eecho "$THIS: warning: TERMDEF file is newer than compiled terms; use --recompile-terms to recompile"
+                fi
+            fi
+        else
+            COMPILE_TERMS=1
+        fi
+
+        if [ $COMPILE_TERMS = 1 ]; then
+            eecho "Compiling terms..."
+
+            # expand m4 macros
+            if [ ${TERMDEF##*.} = m4 ]; then
+                eecho "Expanding m4 macros in $TERMDEF"
+                TMPTERMDEF=$TMPDIR/$THIS-termdef.$$
+                m4 "$TERMDEF" > "$TMPTERMDEF" || { rm -f "$TMPTERMDEF"; return 1; }
+                TERMDEF="$TMPTERMDEF"
+            fi
+
+            eecho "Using term definitions from $TERMDEF"
+            genterms -p "$CORPUS" "$TERMBASE" "$TERMDEF" | mkdrev -s -l -1 -c -b 50000000 "$TERMBASE.tmp"
+            if [ -s "$TERMBASE.lex.isrt" ]; then
+                dumpdrev -c "$TERMBASE.tmp" | maplexrev -c "$TERMBASE.lex.isrt" | mkdrev -l -1 -c -b 50000000 "$TERMBASE"
+            fi
+            rm -f $TERMBASE.tmp* "$TERMBASE.lex.isrt" "$TERMBASE.lex.srt"
+            filterterms "$CORPUS"
+
+            if [ $NO_PARALLEL = 1 ]; then
+                for STAT in arf docf aldf; do
+                    mkstats "$CORPUS" TERM $STAT
+                done
+            else
+                for STAT in arf docf aldf; do
+                    parcmd mkstats "$CORPUS" TERM $STAT
+                done | parallel --gnu --tmpdir "$TMPDIR" -j $CPUS
+            fi
+
+            # remove TMPTERMDEF
+            rm -f "$TMPTERMDEF"
+            if [ $TERMS_COMPILED = 1 -a $REPLACE_TERMS = 1 ]; then
+                rm -f "$ORIGTERMBASE"#*.* "$ORIGTERMBASE".*
+                # here is a tiny race condition, please ignore it :)
+                mv "$TERMTMPDIR"/* "$TERMDIR"
+                rmdir "$TERMTMPDIR"
+                TERMBASE="$ORIGTERMBASE"
+            fi
+
+            # cache will get cleared
+            touch "$PATH_/$PRIMARYATTR".lex
+
+            TERMS_COMPILED=1
+        fi
+    fi
+
+    # THESAURUS ################################################################
+
+    THESAURUS_COMPILED=0
+    COMPILED_THES_FILE="$WSTHES.idx"
+    if [ $SKETCHES_COMPILED = 1 -a -e $COMPILED_THES_FILE ]; then
+        THESAURUS_COMPILED=1
+    fi
+
+    if [ $NO_THESAURUS = 1 ]; then
+        eecho "Compiling thesaurus disabled; skipping..."
+    elif [ $SKETCHES_COMPILED = 0 ]; then
+        eecho "Word sketches are not compiled; skipping thesaurus..."
+    else
+        COMPILE_THESAURUS=0
+        if [ $THESAURUS_COMPILED = 1 ]; then
+            eecho "Thesaurus is compiled"
+            if [ $RECOMPILE_THESAURUS = 1 ]; then
+                eecho "Deleting existing thesaurus..."
+                rm -f "$WSTHES".*
+                COMPILE_THESAURUS=1
+            fi
+        else
+            COMPILE_THESAURUS=1
+        fi
+
+        if [ $COMPILE_THESAURUS = 1 ]; then
+            eecho "Compiling thesaurus..."
+
+            wm2thes "$WSBASE" "$WSBASE-preth" "$CORPUS"
+            mkthes -m 300 "$WSBASE-preth" "$WSTHES"
+
+            rm -f "$WSBASE-preth"*
+        fi
+    fi
+
+    # HISTOGRAMS ################################################################
+
+    HISTOGRAMS_COMPILED=0
+    COMPILED_HIST_FILE=""
+    if [ $SKETCHES_COMPILED = 1 ]; then
+        COMPILED_HIST_FILE="`ls "$WSBASE"* | grep \\.hist$ | head -n1 || :`"
+        [ "$COMPILED_HIST_FILE" ] && HISTOGRAMS_COMPILED=1
+    fi
+
+    if [ $NO_HISTOGRAMS = 1 ]; then
+        eecho "Compiling histograms disabled; skipping..."
+    elif [ $SKETCHES_COMPILED = 0 ]; then
+        eecho "Word sketches are not compiled; skipping histograms..."
+    elif [ -z "$WSHIST" ]; then
+        eecho "WSHIST attribute is not set; skipping histograms..."
+    else
+        COMPILE_HISTOGRAMS=0
+        if [ $HISTOGRAMS_COMPILED = 1 ]; then
+            eecho "Histograms are compiled"
+            if [ $RECOMPILE_HISTOGRAMS = 1 ]; then
+                eecho "Deleting existing histograms..."
+                # <block>
+                # this block is not space-in-path safe
+                for HIST_FILE in `ls "$WSBASE"* | grep \\.hist$`; do
+                    rm -f ${HIST_FILE%.hist}.*
+                done
+                # </block>
+                COMPILE_HISTOGRAMS=1
+            else
+                if [ "$WSHIST" -nt "$COMPILED_HIST_FILE" ]; then
+                    eecho "$THIS: warning: WSHIST file is newer than compiled histograms; use --recompile-histograms to recompile" >&2
+                fi
+            fi
+        else
+            COMPILE_HISTOGRAMS=1
+        fi
+
+        if [ $COMPILE_HISTOGRAMS = 1 ]; then
+            genhist "$CORPUS" "$WSHIST"
+        fi
+    fi
+
+    # ALIGNMENT OF PARALLEL CORPORA #############################################
+
+    if [ $NO_ALIGN = 1 ]; then
+        eecho "Compiling alignment disabled; skipping..."
+    elif [ $CORPUS_COMPILED = 0 ]; then
+        eecho "Corpus is not compiled; skipping alignment..."
+    elif [ -z "$ALIGNED" ]; then
+        eecho "No parallel corpora specified in ALIGNED; skipping alignment..."
+    elif [ -z "$ALIGNDEF" ]; then
+        eecho "No alignment specified in ALIGNDEF; skipping alignment..."
+    else
+        array_implode "$ALIGNDEF" "," "ALIGNDEFS"
+        array_implode "$ALIGNED" "," "ALIGNS"
+        if [ ${#ALIGNDEFS[*]} != ${#ALIGNS[*]} ]; then
+            eecho "Number of alignment definitions in ALIGNDEF does not match number of aligned corpora in ALIGNED; skipping alignment..."
+        else
+            for I in `seq 0 ${#ALIGNDEFS[*]} | head -n -1`; do
+                eecho -n "Compiling alignment for corpus ${ALIGNS[$I]}..."
+                if [ -f $PATH_/align.${ALIGNS[$I]} ] && [ $RECOMPILE_ALIGN = 0 ] ; then
+                    eecho " already compiled; skipping..."
+                else
+                    if [ -n "`echo "${ALIGNDEFS[$I]}" | grep '|'`" ]; then
+                        mkalign <(${ALIGNDEFS[$I]#|}) "$PATH_/align.${ALIGNS[$I]}"
+                    else
+                        mkalign ${ALIGNDEFS[$I]} "$PATH_/align.${ALIGNS[$I]}"
+                    fi
+                    eecho " done."
+                fi
+            done
+        fi
+    fi
+
+    # BILINGUAL DICTIONARIES OF PARALLEL CORPORA #############################################
+
+    if [ $DO_BIDICTS = 0 ]; then
+        eecho "Compiling bilingual dictionaries disabled; skipping..."
+    elif [ $CORPUS_COMPILED = 0 ]; then
+        eecho "Corpus is not compiled; skipping bilingual dictionaries..."
+    elif [ -z "$ALIGNED" ]; then
+        eecho "No parallel corpora specified in ALIGNED; skipping bilingual dictionaries..."
+    else
+        BIDICTATTR=`corpinfo -g BIDICTATTR $CORPUS`
+        ALIGNS=(`echo $ALIGNED | sed 's/,/ /g'`)
+        if [ $RECOMPILE_BIDICTS = 1 ]; then
+            eecho "Deleting existing bilingual dictionaries..."
+            rm -rf "$PATH_"/bidict.*
+        fi
+        for I in `seq 0 ${#ALIGNS[*]} | head -n -1`; do
+            AL_PATH=`corpinfo -g PATH ${ALIGNS[$I]}`
+            AL_BIDICTATTR=`corpinfo -g BIDICTATTR ${ALIGNS[$I]}`
+            eecho -n "Compiling bilingual dictionary for corpus ${ALIGNS[$I]}..."
+            if [ -f $PATH_/bidict.${ALIGNS[$I]}.$BIDICTATTR.$AL_BIDICTATTR ]; then
+                eecho " already compiled; skipping..."
+            elif [ -e "$AL_PATH/$AL_BIDICTATTR.lex" ]; then
+                mkbidict $CORPUS ${ALIGNS[$I]} $BIDICTATTR $AL_BIDICTATTR
+                eecho " done."
+            else
+                eecho "aligned corpus not compiled, skipping..."
+            fi
+        done
+    fi
+
+    # BILINGUAL TERMINOLOGY EXTRACTION #########################################
+
+    REF_TERMS_COMPILED=0
+    if corpinfo "$REFCORPUS" &> /dev/null; then
+        REF_TERMBASE=`corpinfo -g TERMBASE "$REFCORPUS"`
+        if [ -e "$REF_TERMBASE.rev" ]; then
+            REF_TERMS_COMPILED=1
+        fi
+    fi
+
+    if [ $NO_BITERMS = 1 ]; then
+        eecho "Compiling bilingual terminology disabled; skipping..."
+    elif [ $CORPUS_COMPILED = 0 ]; then
+        eecho "Corpus is not compiled; skipping bilingual terminology"
+    elif [ -z "$ALIGNED" ]; then
+        eecho "No parallel corpora specified in ALIGNED; skipping bilingual terminology..."
+    elif [ ! -e "$TERMBASE.rev" ]; then
+        eecho "Corpus has no terms; skipping bilingual terminology"
+    elif [ -z "$REFCORPUS" ]; then
+        eecho "No reference corpus specified in REFCORPUS; skipping bilingual terminology"
+    elif [ $REF_TERMS_COMPILED = 0 ]; then
+        eecho "Reference corpus has no terms; skipping bilingual terminology"
+    else
+        ALIGNS=(`echo $ALIGNED | sed 's/,/ /g'`)
+        if [ $RECOMPILE_BITERMS = 1 ]; then
+            eecho "Deleting existing bilingual terminology files..."
+            rm -rf "$PATH_"/*.biterms
+        fi
+        for I in `seq 0 ${#ALIGNS[*]} | head -n -1`; do
+            if [ -f $PATH_/${ALIGNS[$I]}.biterms ]; then
+                eecho "Bilingual terminology for ${ALIGNS[$I]} already compiled; skipping..."
+                continue
+            fi
+            AL_REFCORPUS=`corpinfo -g REFCORPUS ${ALIGNS[$I]}`
+            if [ -z "$AL_REFCORPUS" ]; then
+                eecho "No reference corpus specified for ${ALIGNS[$I]}; skipping..."
+                continue
+            fi
+            AL_TERMBASE=`corpinfo -g TERMBASE ${ALIGNS[$I]}`
+            if [ ! -e "$AL_TERMBASE.rev" ]; then
+                eecho "Aligned corpus ${ALIGNS[$I]} has no terms; skipping..."
+                continue
+            fi
+            AL_REF_TERMBASE=`corpinfo -g TERMBASE "$AL_REFCORPUS"`
+            if [ ! -e "$AL_REF_TERMBASE.rev" ]; then
+                eecho "Reference corpus $AL_REFCORPUS for corpus ${ALIGNS[$I]} has no terms; skipping..."
+                continue
+            fi
+            biterms $CORPUS ${ALIGNS[$I]} > $PATH_/${ALIGNS[$I]}.biterms
+        done
+    fi
+
+    # TRENDS ####################################################################
+
+    if [ $NO_TRENDS = 1 ]; then
+        eecho "Compiling trends disabled; skipping..."
+    elif [ $CORPUS_COMPILED = 0 ]; then
+        eecho "Corpus is not compiled; skipping trends"
+    elif [ -z "$DIACHRONIC" ]; then
+        eecho "No diachronic structure attributes specified in DIACHRONIC; skipping trends..."
+    else
+        if [ $RECOMPILE_TRENDS = 1 ]; then
+            eecho "Deleting existing trends files..."
+            rm -rf "$PATH_"/*.trends "$PATH_"/*.minigraphs
+        fi
+        if [ $NO_PARALLEL = 1 ]; then
+            for DIASTRUCT in `echo $DIACHRONIC | tr "," " "`; do
+                for ATTR in `echo $DIAPOSATTRS | tr "," " "`; do
+                    if [ -f "$PATH_"/$DIASTRUCT.$ATTR.mkts_all.trends -a -f "$PATH_"/$DIASTRUCT.$ATTR.linreg_all.trends -a \
+                         -f "$PATH_"/$DIASTRUCT.$ATTR.mkts_all.minigraphs -a -f "$PATH_"/$DIASTRUCT.$ATTR.linreg_all.minigraphs ]; then
+                        eecho "Trends already compiled for $DIASTRUCT/$ATTR; skipping..."
+                    else
+                        mktrends "$CORPUS" $DIASTRUCT $ATTR mkts_all,linreg_all 5 0.15
+                    fi
+                done
+            done
+        else
+            for DIASTRUCT in `echo $DIACHRONIC | tr "," " "`; do
+                for ATTR in `echo $DIAPOSATTRS | tr "," " "`; do
+                    if [ -f "$PATH_"/$DIASTRUCT.$ATTR.mkts_all.trends -a -f "$PATH_"/$DIASTRUCT.$ATTR.linreg_all.trends -a \
+                         -f "$PATH_"/$DIASTRUCT.$ATTR.mkts_all.minigraphs -a -f "$PATH_"/$DIASTRUCT.$ATTR.linreg_all.minigraphs ]; then
+                        eecho "Trends already compiled for $DIASTRUCT/$ATTR; skipping..."
+                    else
+                        parcmd mktrends "$CORPUS" $DIASTRUCT $ATTR mkts_all,linreg_all 5 0.15
+                    fi
+                done
+            done | parallel --gnu --tmpdir "$TMPDIR" -j $CPUS
+        fi
+    fi
+
+    # CHECK IF ALL OK ###########################################################
+    if [ ! -d "$PATH_" ]; then
+        eecho "$THIS: warning: PATH dir ($PATH_) not created"
+    else
+        TMPFILES=`ls -1 "$PATH_" | grep '#' | grep -v '^wsdef#' | grep -v '\.log$' || :`
+        if [ "$TMPFILES" ]; then
+            eecho "$THIS: warning: temporary files left in the PATH dir ($PATH_):"
+            echo $TMPFILES
+        fi
+    fi
+    if [ $NO_CHECK = 1 ]; then
+        eecho "Checking corpus sanity disabled; skipping..."
+    else
+        corpcheck $CORPUS
+    fi
+}
+
+TMPDIR=${TMPDIR-/tmp}
+
+
+THIS=`basename $0`
+# the file in which the filepath to the logfile is stored
+LOGFILEPATH="$TMPDIR/$THIS-logfile_path.$$"
+TMPLOGFILE="/var/tmp/$THIS-log.$$"
+
+echo "$@" > "$TMPLOGFILE"
+main "$@" 2>&1 | tee "$TMPLOGFILE"
+cleanuplog $?
+
+
+# vim: ts=4 sw=4 sta et sts=4 si tw=80:

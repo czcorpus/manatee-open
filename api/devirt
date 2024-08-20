@@ -1,0 +1,102 @@
+#!/bin/bash -e
+# Copyright 2013  Milos Jakubicek
+set -o pipefail
+
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 CORPUS OUTDIR [ --dry-run ]"
+    echo "Devirtualizes a (virtual) CORPUS into the output directory OUTDIR."
+    echo "With --dry-run only prints commands that it would run."
+    exit 1;
+fi
+
+CORPUS=$1
+OUTDIR=$2
+[ "$3" == "--dry-run" ] && DRY_RUN=1 || DRY_RUN=0
+ATTRLIST=`corpinfo -g ATTRLIST $CORPUS`
+STRUCTLIST=`corpinfo -g STRUCTLIST $CORPUS`
+STRUCTATTRLIST=`corpinfo -g STRUCTATTRLIST $CORPUS`
+CPATH=`corpinfo -p $CORPUS`
+CONFFILE=`corpinfo -c $CORPUS`
+
+[ -d "$OUTDIR" ] || mkdir -p "$OUTDIR"
+
+dry_run()
+{
+    CMD="$1"
+    if [ $DRY_RUN == 1 ]; then
+        echo "---DRY-RUN--- $1"
+    else
+        echo "Running: $1"
+        eval $1
+    fi
+}
+
+echo "Devirtualizing corpus $CORPUS into directory $OUTDIR"
+
+dry_run "{ echo PATH \"$OUTDIR\" > $CONFFILE.devirted; sed -r 's/^[[:space:]]*(VIRTUAL|PATH).*//' $CONFFILE >> $CONFFILE.devirted; }"
+echo "New configuration file written to $CONFFILE.devirted"
+
+echo "Processing positional attributes..."
+
+IFS=$','
+for ATTR in $ATTRLIST; do
+    echo "Processing attribute '$ATTR'..."
+    [ "`corpinfo -g $ATTR.DYNAMIC $CORPUS`" ] && continue;
+    ATTRTYPE=`corpinfo -g $ATTR.TYPE $CORPUS`
+    if [[ $ATTRTYPE =~ GD$ ]]; then
+        MKDTEXT_OPT="-g"
+    elif [[ $ATTRTYPE =~ BD$ ]]; then
+        MKDTEXT_OPT="-b"
+    else
+        MKDTEXT_OPT=""
+    fi
+    echo "Copying .lex* files..."
+    dry_run "cp $CPATH/$ATTR.lex* $OUTDIR/"
+    echo "done."
+    echo "Creating .rev.* files..."
+    dry_run "dumpattrrev $CORPUS $ATTR | mkdrev $OUTDIR/$ATTR"
+    echo "done."
+    echo "Creating .text.* files..."
+    dry_run "dumpattrtext $CORPUS $ATTR | mkdtext $MKDTEXT_OPT $OUTDIR/$ATTR"
+    echo "done."
+done
+
+echo "Processing structures..."
+
+for STRUCT in $STRUCTLIST; do
+    echo "Processing structure '$STRUCT'..."
+    echo "Creating .rng file..."
+    dry_run "dumpstructrng $CORPUS $STRUCT $OUTDIR/$STRUCT.rng"
+    echo "done."
+done
+
+echo "Processing structure attributes..."
+
+for STRUCTATTR in $STRUCTATTRLIST; do
+    echo "Processing structure attribute '$STRUCTATTR'..."
+    [ "`corpinfo -g $STRUCTATTR.DYNAMIC $CORPUS`" ] && continue;
+    echo "Copying .lex* files..."
+    dry_run "cp $CPATH/$STRUCTATTR.lex* $OUTDIR/"
+    echo "done."
+    echo "Creating .rev.* files..."
+    dry_run "dumpattrrev $CORPUS $STRUCTATTR | mkdrev $OUTDIR/$STRUCTATTR"
+    echo "done."
+    echo "Creating .text file..."
+    dry_run "dumpattrtext $CORPUS $STRUCTATTR | mkdtext -i $OUTDIR/$STRUCTATTR"
+    echo "done."
+done
+
+echo "Processing regexp optimization and dynamic attributes..."
+
+ATTRLIST=$ATTRLIST,$STRUCTATTRLIST
+for ATTR in $ATTRLIST; do
+    dry_run "mkregexattr $CONFFILE.devirted $ATTR"
+    [ "`corpinfo -g $ATTR.DYNAMIC $CORPUS`" ] || continue;
+    echo "Processing dynamic attribute '$ATTR'..."
+    dry_run "mkdynattr $CONFFILE.devirted $ATTR"
+    echo "done."
+done
+
+echo "Devirtualization done."
+
+# vim: ts=4 sw=4 sta et sts=4 si:

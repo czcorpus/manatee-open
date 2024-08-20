@@ -1,0 +1,56 @@
+#!/bin/bash
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+    echo "Usage: corpus4fsa CORPUS"
+	echo "Calls: "
+	echo "addsatfiles CORPUS"
+	echo "ws2fsa CORPUS"
+	echo "terms2fsa CORPUS"
+	echo "ngr2fsa CORPUS ATTR for all attributes ATTR of CORPUS that have ngrams compiled"
+	echo "lex2fsa ATTR for all attributes ATTR of CORPUS"
+	exit 1;
+fi
+
+CORPPATH=`corpinfo -p "$1"`
+WSBASE=`corpinfo -g WSBASE "$1"`
+WSDEF=`corpinfo -g WSDEF "$1"`
+TERMDEF=`corpinfo -g TERMDEF "$1"`
+echo "Running mktokencov $1"
+mktokencov "$1"
+if [ -z "$WSDEF" ]; then
+	echo "Skipping ws2fsa (WSDEF not set)"
+elif [ -s "$WSBASE.wl.fsa" ]; then
+	echo "Skipping ws2fsa (already compiled)"
+else
+	echo "Running ws2fsa $1"
+	ws2fsa "$1"
+fi
+if [ -z "$TERMDEF" ]; then
+	echo "Skipping terms2fsa (TERMDEF not set)"
+elif [ -s "$CORPPATH/terms.fsa" ]; then
+	echo "Skipping terms2fsa (already compiled)"
+else
+	echo "Running terms2fsa $1 $CORPPATH/terms"
+	terms2fsa "$1" "$CORPPATH/terms"
+fi
+
+ATTRS="`corpinfo -g ATTRLIST "$1"`,`corpinfo -g STRUCTATTRLIST "$1"`"
+IFS=$','; for ATTR in $ATTRS; do
+	if [ -s "$CORPPATH/$ATTR.fsa" ]; then
+		echo "Skipping $ATTR (already compiled)"
+	else
+		echo "Running lex2fsa $CORPPATH/$ATTR"
+		lex2fsa "$CORPPATH/$ATTR"
+	fi
+	if [ -e "$CORPPATH/$ATTR.ngr.rev" ]; then
+		if [ -s "$CORPPATH/$ATTR.ngr.wl.fsa" ]; then
+			echo "Skipping ngr2fsa for $ATTR (already compiled)";
+		else
+			echo "Running ngr2fsa $1 $ATTR";
+			ngr2fsa "$1" "$ATTR"
+		fi
+	fi
+done
+
+

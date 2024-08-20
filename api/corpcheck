@@ -1,0 +1,6 @@
+#!/bin/bash
+
+echo "Checking corpus $1:"
+echo " * registry file"
+corpconfcheck $1
+corpdatacheck $1

@@ -1,0 +1,152 @@
+#!/bin/bash -e
+# Copyright 2013-2022  Milos Jakubicek
+set -euo pipefail
+
+JOBS=`nproc`
+TMP_DIR=${TMP_DIR:-/tmp}
+VERBOSE=
+LEXICON_CACHE=0
+CURRTIME="eval date '+[%Y%m%d-%H:%M:%S]'"
+eecho() {
+    echo "$@" >&2
+}
+
+parcmd() {
+    while read CMD; do
+        echo "echo \`$CURRTIME\` === parallel output and job begin for cmd: \"$CMD\" >&2; \
+              $CMD; \
+              echo \`$CURRTIME\` === output and job end >&2"
+    done
+}
+
+USAGE="Usage: $0 [ OPTIONS ] CORPUS [ FILENAME ]
+Compiles CORPUS using multiple jobs in parallel.
+
+Options:
+-j <N>       Use N jobs in parallel (defaults to the number of CPU cores)
+-m <BYTES>   Use at most BYTES memory in total for lexicon caches
+-t <TMPDIR>  Use TMPDIR as temporary directory for storing vertical files
+             (defaults to $TMP_DIR)
+-h           Show this help"
+
+OPTS=`getopt -n "$0" -o vhj:t:m: -- "$@"`
+
+if [ $? != 0 ]; then
+    eecho "$USAGE"
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true; do
+    case $1 in
+        -j) JOBS=$2; shift 2;;
+        -t) TMP_DIR=$2; shift 2;;
+        -v) VERBOSE="-v"; shift 1;;
+        -m) LEXICON_CACHE=$2; shift 2;;
+        -h) eecho "$USAGE"; exit 0;;
+        --) shift; break;;
+        *) eecho "Internal error!"; exit 1;;
+    esac
+done
+
+if [ $# = 0 -o $# -gt 2 ]; then
+    eecho "$USAGE"
+    [ $# = 0 ] && exit 0 || exit 1
+fi
+
+if [ -z `which parallel 2>/dev/null || :` ]; then
+    eecho "No GNU Parallel found installed, please install and retry."
+    exit 1;
+fi
+
+CORPUS=$1
+CORPFILE=`basename $CORPUS`
+TMP_PREF=`mktemp --tmpdir="$TMP_DIR" $CORPFILE.par.XXXXX`
+if [ "$#" -gt 1 ]; then
+    if [ "$2" == "-" ]; then
+        VERTICAL="/dev/stdin"
+    else
+        VERTICAL="$2"
+    fi
+else
+    VERTICAL=`corpinfo -g VERTICAL $CORPUS`
+fi
+DOCSTRUCTURE=`corpinfo -g DOCSTRUCTURE $CORPUS`
+PATH_=`corpinfo -p $CORPUS`
+CONFFILE=`corpinfo -c $CORPUS`
+if [ -z $DOCSTRUCTURE ]; then
+    eecho "Cannot parallelize: DOCSTRUCTURE empty"
+    exit 2;
+fi
+
+eecho "Preparing configuration files..."
+
+for i in `seq 0 $((JOBS-1))`; do
+    CONF="$TMP_PREF".conf.$i
+    sed -r "s/^[[:space:]]*(PATH|VERTICAL|DEFAULTATTR).*//" "$CONFFILE" > "$CONF"
+    # we remove DEFAULTATTR so that it cannot be set to a dynamic attribute
+    # which we do not compile
+    echo "PATH \"$TMP_PREF.dir.$i\"" >> "$CONF"
+done
+
+eecho "Compiling corpus parts..."
+
+LOGDIR="$TMP_PREF.log"
+mkdir -p "$LOGDIR"
+GETVERTICAL=cat
+if [[ "$VERTICAL" =~ ^[[:space:]]*\| ]]; then
+    VERTICAL=`echo "$VERTICAL "| sed 's/[[:space:]]*|//'`
+    GETVERTICAL=eval
+fi
+ENCODEVERTCMD="`echo encodevert -m $(expr $LEXICON_CACHE / $JOBS) -n -r -d -c $TMP_PREF.conf.@JOBID | parcmd`"
+$GETVERTICAL $VERTICAL | vertfork $VERBOSE -t $DOCSTRUCTURE -T $DOCSTRUCTURE -l "$LOGDIR" -b 1000000 $JOBS bash -c "$ENCODEVERTCMD 2>&1"
+find "$LOGDIR" -type f -name "*.err" -printf "%f\n" | sort -n | xargs -I{} cat "$LOGDIR/{}"
+
+
+JOBS=`ls -1 "$LOGDIR" | wc -l` # there might be less jobs in the end because there was not enough input
+
+eecho "Creating virtual corpus..."
+
+VIRTDEF="$TMP_PREF".virt
+echo "#Temporary virtual corpus created by parencodevert" > $VIRTDEF
+for i in `seq 0 $((JOBS-1))`; do
+    [ `corpinfo -s "$TMP_PREF".conf.$i` -eq 0 ] && continue;
+    echo "=$TMP_PREF".conf.$i >> $VIRTDEF
+    echo "0,$" >> $VIRTDEF
+done
+VIRTCONF="$TMP_PREF".conf.virt
+sed -r "s/^[[:space:]]*(PATH|VERTICAL|DEFAULTATTR).*//" "$CONFFILE" > "$VIRTCONF"
+# we remove DEFAULTATTR so that it cannot be set to a dynamic attribute
+# which we do not compile
+echo "PATH \"$TMP_PREF.dir.virt\"" >> "$VIRTCONF"
+echo "VIRTUAL \"$VIRTDEF\"" >> "$VIRTCONF"
+mkdir -p "$TMP_PREF.dir.virt" # prevent races if it would be created by mkvirt
+
+ATTRS=`corpinfo -g ATTRLIST $VIRTCONF`
+STRUCTATTRS=`corpinfo -g STRUCTATTRLIST $VIRTCONF`
+ATTRS=$ATTRS,$STRUCTATTRS
+( IFS=$','; for ATTR in $ATTRS; do
+    [ -z "`corpinfo -g $ATTR.DYNAMIC $CORPUS`" ] && echo mkvirt $VERBOSE -d -a $ATTR $VIRTCONF
+done ) | parcmd | parallel $VERBOSE --gnu --tmpdir "$TMP_DIR" -j $JOBS
+
+eecho "Devirtualizing corpus..."
+
+devirt $VIRTCONF "$PATH_" --dry-run |\
+grep -- '---DRY-RUN---' | egrep -v "mkdynattr|mkregexattr" | sed 's/---DRY-RUN---//' |\
+parcmd | parallel $VERBOSE --gnu --tmpdir "$TMP_DIR" -j $JOBS
+
+eecho "Compiling dynamic attributes..."
+parmkdynattr $CORPUS $JOBS
+
+eecho "Compiling regular expression optimization attributes..."
+( IFS=$','; for ATTR in $ATTRS; do
+    echo mkregexattr $CORPUS $ATTR;
+done ) | parcmd | parallel $VERBOSE --gnu --tmpdir "$TMP_DIR" -j $JOBS
+
+eecho "Cleaning up..."
+rm -rf "$TMP_PREF"*
+
+eecho "Parallel compilation finished."
+
+# vim: ts=4 sw=4 sta et sts=4 si:
