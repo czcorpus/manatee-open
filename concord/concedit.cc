@@ -214,6 +214,13 @@ void Concordance::extend_kwic_coll (int collnum)
     coll_count [collnum - 1] = 0;
 }
 
+
+int custom_rand(int i)
+{
+    return rand() % i;
+}
+
+
 void Concordance::shuffle()
 {
     sync();
@@ -222,7 +229,8 @@ void Concordance::shuffle()
         for (ConcIndex i=0; i < size(); i++)
             (*view)[i] = i;
     }
-    random_shuffle(view->begin(), view->end());
+    srand(1109);
+    random_shuffle(view->begin(), view->end(), custom_rand);
 }
 
 void Concordance::switch_aligned (const char *corpname)
