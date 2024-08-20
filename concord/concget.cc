@@ -326,11 +326,11 @@ void split_attributes (Corpus *corp, const char *astr, PAvec &attrs,
 
 void get_corp_text (PAvec &attrs, string currtags, Position fpos, Position tpos,
                     vector<string> &strs, vector<string> &tags,
-                    char posdelim = ' ', char attrdelim = '/')
+                    char posdelim = ' ', char attrdelim = '\x1F')
 {
     if (fpos >= tpos || attrs.empty()) return;
     TextIterator *wordi = attrs[0]->textat (fpos);
-    //printf ("get_corp_text: currtags=%s, attrs.size=%i, fpos=%i tpos=%i\n", 
+    //printf ("get_corp_text: currtags=%s, attrs.size=%i, fpos=%i tpos=%i\n",
     //currtags.c_str(), attrs.size(), fpos, tpos);
     if (attrs.size() == 1) {
         for (; fpos < tpos; fpos++) {
