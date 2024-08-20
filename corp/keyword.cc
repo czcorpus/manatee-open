@@ -1,5 +1,6 @@
 //  Copyright (c) 2016-2023  Milos Jakubicek
 
+#include <cmath>
 #include <finlib/regpref.hh>
 #include "subcorp.hh"
 #include "keyword.hh"
@@ -39,6 +40,15 @@ Keyword::Keyword (Corpus *c1, Corpus *c2, WordList *wl1, WordList *wl2, float N,
              vector<string> pos_regex_filters, vector<string> neg_regex_filters, FILE* progress)
             : curr (0), totalcount(0), totalfreq1(0), totalfreq2(0)
 {
+    string str_params(frqtype), ftype, scoretype;
+    int n = str_params.find(";");
+    if (n == -1) {
+        ftype = str_params;
+    } else {
+        ftype = str_params.substr(0, n);
+        scoretype = str_params.substr(n+1);
+    }
+
     vector<regexp_pattern*> pos_regpats;
     for (auto it = pos_regex_filters.begin(); it != pos_regex_filters.end(); it++) {
         if (!(*it).size())
@@ -67,9 +77,10 @@ Keyword::Keyword (Corpus *c1, Corpus *c2, WordList *wl1, WordList *wl2, float N,
 
     const float c1size = c1->search_size();
     const float c2size = c2->search_size();
+    const float c12size = c1size + c2size;
     const float wl1_maxid = wl1->id_range();
-    Frequency *stat1 = wl1->get_stat(frqtype);
-    Frequency *stat2 = wl2->get_stat(frqtype);
+    Frequency *stat1 = wl1->get_stat(ftype.c_str());
+    Frequency *stat2 = wl2->get_stat(ftype.c_str());
     vector<AllowMissingFrequency> addfreqs1, addfreqs2;
     for (auto it = addfreqs.begin(); it != addfreqs.end(); it++) {
         addfreqs1.emplace_back(wl1, (*it).c_str());
@@ -97,14 +108,38 @@ Keyword::Keyword (Corpus *c1, Corpus *c2, WordList *wl1, WordList *wl2, float N,
         totalfreq2 += f2;
         float fpm1 = f1 * 1000000 / c1size;
         float fpm2 = f2 * 1000000 / c2size;
-        double *freqs = new double[2*addfreqs.size() + 4];
+        // adding 4 additional fields to `freqs`
+        double *freqs = new double[2*addfreqs.size() + 4 + 4];
         freqs[0] = f1; freqs[1] = f2;
         freqs[2] = fpm1; freqs[3] = fpm2;
         for (unsigned i = 0; i < addfreqs.size(); i++) {
             freqs[2*i+4] = addfreqs1[i].freq(id1);
             freqs[2*i+5] = id2 == -1 ? 0 : addfreqs2[i].freq(id2);
         }
-        float score = (fpm1 + N) / (fpm2 + N);
+
+        double e1 = c1size * (f1 + f2) / c12size;
+        double e2 = c2size * (f1 + f2) / c12size;
+        freqs[2*addfreqs.size() + 4] = (fpm1 + N) / (fpm2 + N); // manatee score
+        freqs[2*addfreqs.size() + 5] = 2 * (f1*log(f1/e1) + f2*log(f2/e2)); // logL score
+        freqs[2*addfreqs.size() + 6] = (f1-e1)*(f1-e1)/e1 + (f2-e2)*(f2-e2)/e2; // chi2 score
+        freqs[2*addfreqs.size() + 7] = 100 * ((fpm1 - fpm2) / (fpm1 + fpm2)); // DIN size effect
+
+        float score;
+        if (scoretype == "logL") {
+            if (isnan(freqs[2*addfreqs.size() + 5])) {
+                score = 0;
+            } else {
+                score = freqs[2*addfreqs.size() + 5];
+            }
+        } else if (scoretype == "chi2") {
+            score = freqs[2*addfreqs.size() + 6];
+        } else if (scoretype == "din") {
+            score = freqs[2*addfreqs.size() + 7];
+        } else {
+            score = freqs[2*addfreqs.size() + 4];
+        }
+
+
         if (heap.size() < maxlen) {
             if (!check_string (str, pos_regpats, neg_regpats, blacklist, whitelist)) {
                 delete[] freqs;
