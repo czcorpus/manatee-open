@@ -2,7 +2,7 @@
 # Copyright (c) 2003-2023  Pavel Rychly, Milos Jakubicek, Ondrej Herman, Jan Michelfeit
 
 AC_COPYRIGHT([Copyright (c) 2003-2020, Pavel Rychly, Milos Jakubicek, Ondrej Herman, Jan Michelfeit])
-AC_INIT([manatee],[open-2.225.8],[pary@fi.muni.cz])
+AC_INIT([manatee],[open-2.225.8-cnc],[pary@fi.muni.cz])
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR(config)
 AC_CONFIG_SRCDIR(corp/corpus.hh)
