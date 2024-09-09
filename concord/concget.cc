@@ -13,7 +13,7 @@ using namespace std;
 
 
 //-------------------- pos_event --------------------
-typedef enum {ev_BEG, ev_END, ev_BKW, ev_EKW, ev_STRUCT, 
+typedef enum {ev_BEG, ev_END, ev_BKW, ev_EKW, ev_STRUCT,
               ev_BTAG, ev_ETAG, ev_TEXT} event_t;
 
 class pos_event {
@@ -22,7 +22,7 @@ public:
     int sub;   // priority
     event_t type;
     std::string value;
-    pos_event (event_t t, Position pos, int sub, const std::string &val="") 
+    pos_event (event_t t, Position pos, int sub, const std::string &val="")
         :pos (pos), sub(sub), type(t), value (val) {}
     pos_event (Position pos, int sub, const std::string &val)
         :pos (pos), sub (sub), type (ev_STRUCT), value (val) {}
@@ -37,13 +37,13 @@ protected:
     string display_class, display_begin, display_end;
     list< pair< pair<int, int>, PosAttr*> > display_begin_attrs, display_end_attrs;
 public:
-    OutStruct (Structure *s) 
+    OutStruct (Structure *s)
         : str(s), display_tag (str->get_conf("DISPLAYTAG") != "0"),
           display_empty (false),
-          display_class (str->get_conf("DISPLAYCLASS")), 
-          display_begin (str->get_conf("DISPLAYBEGIN")), 
+          display_class (str->get_conf("DISPLAYCLASS")),
+          display_begin (str->get_conf("DISPLAYBEGIN")),
           display_end (str->get_conf("DISPLAYEND"))
-    { 
+    {
         if (display_begin == "_EMPTY_") {
             display_begin = "";
             display_empty = true;
@@ -82,7 +82,7 @@ public:
         return display_text;
     }
     void add_struct_events (int priority, Position fpos, Position tpos, vector<pos_event> &events) {
-        for (Position num = str->rng->num_next_pos (fpos); 
+        for (Position num = str->rng->num_next_pos (fpos);
              num < str->rng->size(); num++) {
             Position b = str->rng->beg_at (num);
             Position e = str->rng->end_at (num);
@@ -142,7 +142,7 @@ public:
         attrs.clear();
         for (CorpInfo::VSC::iterator i = str->conf->attrs.begin();
              i != str->conf->attrs.end(); i++) {
-            attrs.push_back (make_pair ((*i).first, 
+            attrs.push_back (make_pair ((*i).first,
                                         str->get_attr ((*i).first)));
         }
     }
@@ -151,11 +151,11 @@ public:
 
 //-------------------- split_structures --------------------
 
-void split_structures (Corpus *corp, const char *astr, OSvec &attrs, 
+void split_structures (Corpus *corp, const char *astr, OSvec &attrs,
                        bool ignore_nondef)
 {
     istringstream as (astr);
-    string item; 
+    string item;
     map<string,OutStruct*> ss;
     while (getline (as, item, ',')) {
         if (item.empty() || item[0] == '-')
@@ -233,7 +233,7 @@ class ORstructval: public OutRef {
 public:
     ORstructval (Structure *s, const string &attrname, const string &p="",
                  bool value_only=false)
-        : str(s), attr (s->get_attr (attrname)), 
+        : str(s), attr (s->get_attr (attrname)),
           pref (value_only ? "" :
                 (p.empty() ? (s->name + '.' + attrname + '=') : (p + '='))) {}
     virtual ~ORstructval() {}
@@ -256,20 +256,20 @@ public:
         if (n == -1)
             return false;
         out << '<' << str->name;
-        for (CorpInfo::VSC::iterator i = str->conf->attrs.begin(); 
+        for (CorpInfo::VSC::iterator i = str->conf->attrs.begin();
              i != str->conf->attrs.end(); i++)
-            out << ' ' << (*i).first << '=' 
+            out << ' ' << (*i).first << '='
                 << str->get_attr ((*i).first)->pos2str (n);
         out << '>';
         return true;
     }
 };
 
-void split_references (Corpus *corp, const char *astr, ORvec &refs, 
+void split_references (Corpus *corp, const char *astr, ORvec &refs,
                        bool ignore_nondef)
 {
     istringstream as (astr);
-    string item; 
+    string item;
     string::size_type idx;
     OutRef *r;
     while (getline (as, item, ',')) {
@@ -306,11 +306,11 @@ void split_references (Corpus *corp, const char *astr, ORvec &refs,
     }
 }
 
-void split_attributes (Corpus *corp, const char *astr, PAvec &attrs, 
+void split_attributes (Corpus *corp, const char *astr, PAvec &attrs,
                        bool ignore_nondef)
 {
     istringstream as (astr);
-    string attr; 
+    string attr;
     while (getline (as, attr, ',')) {
         if (attr.empty())
             continue;
@@ -326,11 +326,11 @@ void split_attributes (Corpus *corp, const char *astr, PAvec &attrs,
 
 void get_corp_text (PAvec &attrs, string currtags, Position fpos, Position tpos,
                     vector<string> &strs, vector<string> &tags,
-                    char posdelim = ' ', char attrdelim = '/')
+                    char posdelim = ' ', char attrdelim = '\x1F')
 {
     if (fpos >= tpos || attrs.empty()) return;
     TextIterator *wordi = attrs[0]->textat (fpos);
-    //printf ("get_corp_text: currtags=%s, attrs.size=%i, fpos=%i tpos=%i\n", 
+    //printf ("get_corp_text: currtags=%s, attrs.size=%i, fpos=%i tpos=%i\n",
     //currtags.c_str(), attrs.size(), fpos, tpos);
     if (attrs.size() == 1) {
         for (; fpos < tpos; fpos++) {
@@ -416,7 +416,7 @@ static const char *str2tcl (const string &str)
     char *p = buff;
     //printf ("str2tcl (%s)\n", s);
     for (; *s; s++, p++) {
-        if (*s == ' ' || *s == '"' || *s == '\\' || *s == '{' || *s == '}' 
+        if (*s == ' ' || *s == '"' || *s == '\\' || *s == '{' || *s == '}'
             || *s == ';' || *s == '[' || *s == ']' || *s == '$')
             *p++ = '\\';
         *p = *s;
@@ -452,7 +452,7 @@ KWICLines::KWICLines (Corpus *c, RangeStream *r, const char *left,
     }
 }
 
-KWICLines::~KWICLines() 
+KWICLines::~KWICLines()
 {
     delete leftctx;
     delete rightctx;
@@ -601,12 +601,12 @@ bool KWICLines::nextline () {
     bool inside = false;
     bool addspace = false;
     Position a1 = events[0].pos;
-    for (vector<pos_event>::iterator e = events.begin(); 
+    for (vector<pos_event>::iterator e = events.begin();
          e != events.end(); e++) {
         Position a2 = e->pos;
         event_t event = e->type;
         //printf ("tcl_get_line for: event=%i, a1=%i, a2=%i\n", event, a1, a2);
-        
+
         if (a1 < a2 && inside) {
             if (addspace) {
                 partstr.push_back (" ");
@@ -696,8 +696,8 @@ void tcl_output_tokens (ostream &out, const Tokens &toks)
     }
 }
 
-void Concordance::tcl_get (ostream &out, ConcIndex beg, ConcIndex end, 
-                           const char *left, const char *right, 
+void Concordance::tcl_get (ostream &out, ConcIndex beg, ConcIndex end,
+                           const char *left, const char *right,
                            const char *ctxa, const char *kwica,
                            const char *struca, const char *refa)
 {
@@ -801,11 +801,11 @@ const Tokens &CorpRegion::region (Position frompos, Position topos,
     bool inside = false;
     bool addspace = false;
     Position a1 = events[0].pos;
-    for (vector<pos_event>::iterator e = events.begin(); 
+    for (vector<pos_event>::iterator e = events.begin();
          e != events.end(); e++) {
         Position a2 = e->pos;
         event_t event = e->type;
-        
+
         if (a1 < a2 && inside) {
             if (addspace) {
                 partstr.push_back (" ");
