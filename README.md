@@ -8,6 +8,9 @@ please refer to a respective branch (e.g. `release-2.223.6`).
 0. make sure  `build-essential`, `libtool`, `autoconf-archive` are installed
 1. clone the repository, make sure all the dependencies are installed (:construction: - list deps):
    * `libpcre3-dev`
+   * `bison`
+   * `libltdl-dev`
+   * `swig3.0`
 2. `autoreconf --install --force`
 3. `./configure --with-pcre`
 4. `make`
