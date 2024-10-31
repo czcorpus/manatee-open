@@ -88,6 +88,9 @@ void WordList::prepare_multivalue_map(const char *multisep) {
                     new_ids.insert(str2id(new_val));
                 }
         } else {  // MULTISEP is a single byte delimiter
+            if (strchr (full_value, *multisep) == NULL) {
+                continue;
+            }
             static int value_len = 0;
             static char *value = NULL;
             ensuresize (value, value_len, strlen (full_value) +1, "store_multival");
