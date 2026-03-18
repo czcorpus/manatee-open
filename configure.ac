@@ -61,6 +61,44 @@ AC_SUBST(AM_CPPFLAGS)
 # Checks for header files.
 AC_CHECK_HEADERS([locale.h stdlib.h string.h unistd.h fsa3/writefsa.h hat-trie/hat-trie.h])
 
+# Check for Lua
+PKG_CHECK_MODULES([LUA], [lua >= 5.1], [
+    AC_DEFINE([HAVE_LUA], [1], [Define to 1 if you have Lua])
+    LUA_INCLUDE="$LUA_CFLAGS"
+    LUA_LIB="$LUA_LIBS"
+], [
+    # Try lua5.x naming
+    PKG_CHECK_MODULES([LUA], [lua5.4], [
+        AC_DEFINE([HAVE_LUA], [1], [Define to 1 if you have Lua])
+        LUA_INCLUDE="$LUA_CFLAGS"
+        LUA_LIB="$LUA_LIBS"
+    ], [
+        PKG_CHECK_MODULES([LUA], [lua5.3], [
+            AC_DEFINE([HAVE_LUA], [1], [Define to 1 if you have Lua])
+            LUA_INCLUDE="$LUA_CFLAGS"
+            LUA_LIB="$LUA_LIBS"
+        ], [
+            PKG_CHECK_MODULES([LUA], [lua5.2], [
+                AC_DEFINE([HAVE_LUA], [1], [Define to 1 if you have Lua])
+                LUA_INCLUDE="$LUA_CFLAGS"
+                LUA_LIB="$LUA_LIBS"
+            ], [
+                PKG_CHECK_MODULES([LUA], [lua5.1], [
+                    AC_DEFINE([HAVE_LUA], [1], [Define to 1 if you have Lua])
+                    LUA_INCLUDE="$LUA_CFLAGS"
+                    LUA_LIB="$LUA_LIBS"
+                ], [
+                    AC_MSG_WARN([Lua not found, concordance Lua callbacks will not be available])
+                    LUA_INCLUDE=""
+                    LUA_LIB=""
+                ])
+            ])
+        ])
+    ])
+])
+AC_SUBST(LUA_INCLUDE)
+AC_SUBST(LUA_LIB)
+
 # Checks for typedefs, structures, and compiler characteristics.
 AC_SYS_LARGEFILE
 

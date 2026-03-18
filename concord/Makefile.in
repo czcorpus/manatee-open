@@ -109,7 +109,8 @@ CONFIG_HEADER = $(top_builddir)/config.hh
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
-libconcord_la_LIBADD =
+am__DEPENDENCIES_1 =
+libconcord_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am__libconcord_la_SOURCES_DIST = conccrit.cc concctx.cc concedit.cc \
 	concget.cc concgrp.cc concord.cc concsave.cc concsort.cc \
 	concstat.cc concfreq.cc concstrm.cc concord.hh conccrit.hh \
@@ -242,7 +243,8 @@ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AM_CPPFLAGS = @AM_CPPFLAGS@ -I${top_srcdir}/finlib \
-	-I$(top_srcdir)/corp -I$(top_srcdir)/query $(ZTHREAD_CPPFLAGS)
+	-I$(top_srcdir)/corp -I$(top_srcdir)/query $(ZTHREAD_CPPFLAGS) \
+	$(LUA_INCLUDE)
 AM_CXXFLAGS = @AM_CXXFLAGS@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
@@ -295,6 +297,10 @@ LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
+LUA_CFLAGS = @LUA_CFLAGS@
+LUA_INCLUDE = @LUA_INCLUDE@
+LUA_LIB = @LUA_LIB@
+LUA_LIBS = @LUA_LIBS@
 MAKEINFO = @MAKEINFO@
 MANATEE_REGISTRY = @MANATEE_REGISTRY@
 MANIFEST_TOOL = @MANIFEST_TOOL@
@@ -317,6 +323,9 @@ PCRE_SUBDIRS = @PCRE_SUBDIRS@
 PERL = @PERL@
 PERL_CPPFLAGS = @PERL_CPPFLAGS@
 PERL_SITE_PKG = @PERL_SITE_PKG@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PTHREAD_LIBS = @PTHREAD_LIBS@
 PYTHON = @PYTHON@
 PYTHON_CPPFLAGS = @PYTHON_CPPFLAGS@
@@ -415,6 +424,7 @@ libconcord_la_SOURCES = conccrit.cc concctx.cc concedit.cc concget.cc \
 	concfreq.cc concstrm.cc $(am__append_1)
 concord_headers = concord.hh conccrit.hh concget.hh concstat.hh
 @CXXLIB_TRUE@pkginclude_HEADERS = $(concord_headers)
+libconcord_la_LIBADD = $(LUA_LIB)
 all: all-am
 
 .SUFFIXES:

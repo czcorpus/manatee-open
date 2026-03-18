@@ -8,6 +8,8 @@
 #include <iostream>
 #include <stdint.h>
 
+struct lua_State;
+
 class ConcNotFound: public std::exception {
     const std::string _what;
 public:
@@ -189,11 +191,18 @@ public:
 
     //-------------------- KWICLines --------------------
     friend class KWICLines;
-    void tcl_get (std::ostream &out, ConcIndex beg, ConcIndex end, 
+    void tcl_get (std::ostream &out, ConcIndex beg, ConcIndex end,
                   const char *left, const char *right,
                   const char *ctxa, const char *kwica,
                   const char *struca, const char *refa);
     void tcl_get_reflist (std::ostream &out, ConcIndex idx, const char *reflist);
+
+    // Lua callback variant
+    void tcl_get_lua (std::ostream &out, ConcIndex beg, ConcIndex end,
+                      const char *left, const char *right,
+                      const char *ctxa, const char *kwica,
+                      const char *struca, const char *refa,
+                      lua_State *L, const char *callback_name);
 
     //-------------------- statistics --------------------
     int distribution (std::vector<int> &vals, std::vector<int> &beginnings,

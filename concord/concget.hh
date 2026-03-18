@@ -5,6 +5,8 @@
 
 #include "concord.hh"
 
+struct lua_State;
+
 
 //--------------------  --------------------
 typedef std::vector<PosAttr*> PAvec;
@@ -32,6 +34,12 @@ protected:
 
     Position reduce_ctxbeg();
     Position reduce_ctxend();
+
+    // Lua callback support
+    lua_State *L;
+    std::string lua_callback_name;
+    bool use_lua_callback;
+
 public:
     KWICLines (Corpus *corp, RangeStream *r, const char *left,
                const char *right,  const char *kwica, const char *ctxa,
@@ -52,6 +60,11 @@ public:
     const Tokens &get_kwic() {return outkwic;}
     const Tokens &get_right() {return outright;}
     const int get_linegroup();
+
+    // Lua callback methods
+    void set_lua_callback(lua_State *lua_state, const char *callback_name);
+    void clear_lua_callback();
+    bool has_lua_callback() const { return use_lua_callback; }
 };
 
 //-------------------- CorpRegion --------------------

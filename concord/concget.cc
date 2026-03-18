@@ -9,6 +9,12 @@
 #include <cstdlib>
 #include <cstring>
 
+extern "C" {
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
+}
+
 using namespace std;
 
 
@@ -435,7 +441,8 @@ KWICLines::KWICLines (Corpus *c, RangeStream *r, const char *left,
                       bool ignore_nondef)
     : corp (c), rstream (r), leftctx (prepare_context (c, left, true, maxctx)),
       rightctx (prepare_context (c, right, false, maxctx)),
-      inutf8 (corp->get_conf ("ENCODING") == "UTF-8")
+      inutf8 (corp->get_conf ("ENCODING") == "UTF-8"),
+      L (NULL), use_lua_callback (false)
 {
     split_attributes (corp, kwica, kwicattrs, ignore_nondef);
     if (!ctxa || *ctxa == '\0')
@@ -452,7 +459,7 @@ KWICLines::KWICLines (Corpus *c, RangeStream *r, const char *left,
     }
 }
 
-KWICLines::~KWICLines() 
+KWICLines::~KWICLines()
 {
     delete leftctx;
     delete rightctx;
@@ -463,6 +470,19 @@ KWICLines::~KWICLines()
         delete *i;
 }
 
+void KWICLines::set_lua_callback(lua_State *lua_state, const char *callback_name)
+{
+    L = lua_state;
+    lua_callback_name = callback_name ? callback_name : "";
+    use_lua_callback = (L != NULL && !lua_callback_name.empty());
+}
+
+void KWICLines::clear_lua_callback()
+{
+    L = NULL;
+    lua_callback_name.clear();
+    use_lua_callback = false;
+}
 
 static void fill_segment (Tokens &partstr, Tokens &parttag, Tokens &output)
 {
@@ -696,6 +716,18 @@ void tcl_output_tokens (ostream &out, const Tokens &toks)
     }
 }
 
+// Helper function to push Tokens vector to Lua as a table
+static void lua_push_tokens(lua_State *L, const Tokens &toks)
+{
+    lua_newtable(L);
+    int idx = 1;
+    for (Tokens::const_iterator t = toks.begin(); t != toks.end(); ++t, ++idx) {
+        lua_pushinteger(L, idx);
+        lua_pushstring(L, t->c_str());
+        lua_settable(L, -3);
+    }
+}
+
 void Concordance::tcl_get (ostream &out, ConcIndex beg, ConcIndex end, 
                            const char *left, const char *right, 
                            const char *ctxa, const char *kwica,
@@ -735,6 +767,209 @@ void Concordance::tcl_get (ostream &out, ConcIndex beg, ConcIndex end,
             tcl_output_tokens (out, klines.get_right());
             out << '\n';
             klines.nextline ();
+        }
+    }
+}
+
+void Concordance::tcl_get_lua (ostream &out, ConcIndex beg, ConcIndex end,
+                               const char *left, const char *right,
+                               const char *ctxa, const char *kwica,
+                               const char *struca, const char *refa,
+                               lua_State *L, const char *callback_name)
+{
+    if (!L || !callback_name || !*callback_name) {
+        // Fall back to default behavior if no Lua callback
+        tcl_get(out, beg, end, left, right, ctxa, kwica, struca, refa);
+        return;
+    }
+
+    int maxctx = 0;
+    if (beg +1 == end) {
+        maxctx = atol (corp->conf->opts["MAXDETAIL"].c_str());
+    }
+
+    KWICLines klines (this->corp, this->RS (true, beg, end), left, right,
+                      kwica, ctxa, struca, refa, maxctx);
+
+    if (beg < end) {
+        if (beg < 0) beg = 0;
+        if (end > viewsize()) end = viewsize();
+        for (; beg < end; beg++) {
+            // Get the Lua callback function
+            lua_getglobal(L, callback_name);
+            if (!lua_isfunction(L, -1)) {
+                lua_pop(L, 1);
+                // Fall back to default if callback not found
+                if (!klines.get_ref_list().empty())
+                    out << str2tcl (klines.get_refs()) << " strc";
+                tcl_output_tokens (out, klines.get_left());
+                tcl_output_tokens (out, klines.get_kwic());
+                if (klines.get_linegroup())
+                    out << " (" << klines.get_linegroup() << ") grp";
+                tcl_output_tokens (out, klines.get_right());
+                out << '\n';
+                klines.nextline();
+                continue;
+            }
+
+            // Create a table with concordance data
+            lua_newtable(L);
+
+            // Add refs
+            lua_pushstring(L, "refs");
+            lua_pushstring(L, klines.get_refs().c_str());
+            lua_settable(L, -3);
+
+            // Add left context
+            lua_pushstring(L, "left");
+            lua_push_tokens(L, klines.get_left());
+            lua_settable(L, -3);
+
+            // Add kwic
+            lua_pushstring(L, "kwic");
+            lua_push_tokens(L, klines.get_kwic());
+            lua_settable(L, -3);
+
+            // Add right context
+            lua_pushstring(L, "right");
+            lua_push_tokens(L, klines.get_right());
+            lua_settable(L, -3);
+
+            // Add linegroup
+            lua_pushstring(L, "linegroup");
+            lua_pushinteger(L, klines.get_linegroup());
+            lua_settable(L, -3);
+
+            // Add position info
+            lua_pushstring(L, "pos");
+            lua_pushinteger(L, klines.get_pos());
+            lua_settable(L, -3);
+
+            lua_pushstring(L, "kwiclen");
+            lua_pushinteger(L, klines.get_kwiclen());
+            lua_settable(L, -3);
+
+            lua_pushstring(L, "ctxbeg");
+            lua_pushinteger(L, klines.get_ctxbeg());
+            lua_settable(L, -3);
+
+            lua_pushstring(L, "ctxend");
+            lua_pushinteger(L, klines.get_ctxend());
+            lua_settable(L, -3);
+
+            // Create output collector (table for appending strings)
+            lua_newtable(L);
+
+            // Call the Lua function: callback(line_data, output_collector)
+            if (lua_pcall(L, 2, 1, 0) != 0) {
+                // Error in Lua callback, fall back to default
+                cerr << "Error in Lua callback: " << lua_tostring(L, -1) << endl;
+                lua_pop(L, 1);
+                if (!klines.get_ref_list().empty())
+                    out << str2tcl (klines.get_refs()) << " strc";
+                tcl_output_tokens (out, klines.get_left());
+                tcl_output_tokens (out, klines.get_kwic());
+                if (klines.get_linegroup())
+                    out << " (" << klines.get_linegroup() << ") grp";
+                tcl_output_tokens (out, klines.get_right());
+                out << '\n';
+            } else {
+                // Get the result from Lua (should be a string or table)
+                if (lua_isstring(L, -1)) {
+                    out << lua_tostring(L, -1);
+                } else if (lua_istable(L, -1)) {
+                    // Iterate through table and concatenate strings
+                    lua_pushnil(L);
+                    while (lua_next(L, -2) != 0) {
+                        if (lua_isstring(L, -1)) {
+                            out << lua_tostring(L, -1);
+                        }
+                        lua_pop(L, 1);
+                    }
+                }
+                lua_pop(L, 1);
+            }
+
+            klines.nextline();
+        }
+    } else {
+        if (end < 0) end = 0;
+        if (beg > viewsize()) beg = viewsize();
+        for (beg--; end <= beg; beg--) {
+            // Similar logic for reverse iteration
+            lua_getglobal(L, callback_name);
+            if (!lua_isfunction(L, -1)) {
+                lua_pop(L, 1);
+                if (!klines.get_ref_list().empty())
+                    out << str2tcl (klines.get_refs()) << " strc";
+                tcl_output_tokens (out, klines.get_left());
+                tcl_output_tokens (out, klines.get_kwic());
+                if (klines.get_linegroup())
+                    out << '(' << klines.get_linegroup() << ") grp";
+                tcl_output_tokens (out, klines.get_right());
+                out << '\n';
+                klines.nextline();
+                continue;
+            }
+
+            lua_newtable(L);
+            lua_pushstring(L, "refs");
+            lua_pushstring(L, klines.get_refs().c_str());
+            lua_settable(L, -3);
+            lua_pushstring(L, "left");
+            lua_push_tokens(L, klines.get_left());
+            lua_settable(L, -3);
+            lua_pushstring(L, "kwic");
+            lua_push_tokens(L, klines.get_kwic());
+            lua_settable(L, -3);
+            lua_pushstring(L, "right");
+            lua_push_tokens(L, klines.get_right());
+            lua_settable(L, -3);
+            lua_pushstring(L, "linegroup");
+            lua_pushinteger(L, klines.get_linegroup());
+            lua_settable(L, -3);
+            lua_pushstring(L, "pos");
+            lua_pushinteger(L, klines.get_pos());
+            lua_settable(L, -3);
+            lua_pushstring(L, "kwiclen");
+            lua_pushinteger(L, klines.get_kwiclen());
+            lua_settable(L, -3);
+            lua_pushstring(L, "ctxbeg");
+            lua_pushinteger(L, klines.get_ctxbeg());
+            lua_settable(L, -3);
+            lua_pushstring(L, "ctxend");
+            lua_pushinteger(L, klines.get_ctxend());
+            lua_settable(L, -3);
+
+            lua_newtable(L);
+
+            if (lua_pcall(L, 2, 1, 0) != 0) {
+                cerr << "Error in Lua callback: " << lua_tostring(L, -1) << endl;
+                lua_pop(L, 1);
+                if (!klines.get_ref_list().empty())
+                    out << str2tcl (klines.get_refs()) << " strc";
+                tcl_output_tokens (out, klines.get_left());
+                tcl_output_tokens (out, klines.get_kwic());
+                if (klines.get_linegroup())
+                    out << '(' << klines.get_linegroup() << ") grp";
+                tcl_output_tokens (out, klines.get_right());
+                out << '\n';
+            } else {
+                if (lua_isstring(L, -1)) {
+                    out << lua_tostring(L, -1);
+                } else if (lua_istable(L, -1)) {
+                    lua_pushnil(L);
+                    while (lua_next(L, -2) != 0) {
+                        if (lua_isstring(L, -1)) {
+                            out << lua_tostring(L, -1);
+                        }
+                        lua_pop(L, 1);
+                    }
+                }
+                lua_pop(L, 1);
+            }
+
+            klines.nextline();
         }
     }
 }

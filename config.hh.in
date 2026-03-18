@@ -39,6 +39,9 @@
 /* Define to 1 if you have the <locale.h> header file. */
 #undef HAVE_LOCALE_H
 
+/* Define to 1 if you have Lua */
+#undef HAVE_LUA
+
 /* Define to 1 if you have the `memmove' function. */
 #undef HAVE_MEMMOVE
 

@@ -12,5 +12,7 @@ else
 libconcord_la_SOURCES += $(concord_headers)
 endif
 
-AM_CPPFLAGS += -I${top_srcdir}/finlib -I$(top_srcdir)/corp -I$(top_srcdir)/query $(ZTHREAD_CPPFLAGS)
+AM_CPPFLAGS += -I${top_srcdir}/finlib -I$(top_srcdir)/corp -I$(top_srcdir)/query $(ZTHREAD_CPPFLAGS) $(LUA_INCLUDE)
+
+libconcord_la_LIBADD = $(LUA_LIB)
 
