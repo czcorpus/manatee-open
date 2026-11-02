@@ -92,21 +92,39 @@ private:
     PosAttr *attr1, *attr2;
     int arg1, arg2;
     Op op;
+    bool bitset1, bitset2;
+    std::vector<int> set1, set2;
 public:
     FilterCondVal (Corpus *c, PosAttr *pa1, PosAttr *pa2, int lab1, int lab2, Op binop)
         : attr1 (pa1), attr2 (pa2), arg1 (lab1), arg2 (lab2), op (binop)
     {
         auto ao = c->conf->find_attr(attr1->name);
+        bitset1 = ao["TYPE"] == "BITSET";
         bool multival = c->conf->str2bool (ao["MULTIVALUE"]);
-        if (multival)
+        if (multival && !bitset1)
             attr1->prepare_multivalue_map(ao["MULTISEP"].c_str());
         ao = c->conf->find_attr(attr2->name);
+        bitset2 = ao["TYPE"] == "BITSET";
         multival = c->conf->str2bool (ao["MULTIVALUE"]);
-        if (multival)
+        if (multival && !bitset2)
             attr2->prepare_multivalue_map(ao["MULTISEP"].c_str());
     }
 
     virtual bool eval (Labels &labs) {
+        if (bitset1 || bitset2) {
+            // sets of values (TYPE BITSET) are equal only as whole sets
+            bool match;
+            if (attr1 == attr2) {
+                attr1->posset (labs [arg1], set1);
+                attr2->posset (labs [arg2], set2);
+                match = set1 == set2;
+            } else {
+                // compare the joined (canonically ordered) values
+                string s1 (attr1->pos2str (labs [arg1]));
+                match = s1 == attr2->pos2str (labs [arg2]);
+            }
+            return (op == F_EQ) == match;
+        }
         int id1 = attr1->pos2id (labs [arg1]);
         int id2 = attr2->pos2id (labs [arg2]);
         bool match = false;

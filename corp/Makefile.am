@@ -4,7 +4,7 @@ noinst_LTLIBRARIES = libcorp.la
 libcorp_la_SOURCES = corpconf.cc corpus.cc dynattr.cc dynfun.cc \
 	loadconf.cc posattr.cc struct.cc subcorp.cc bgrstat.cc calign.cc \
 	dynattr.hh dynfun.hh virtcorp.cc utf8.cc corpstat.cc \
-	pauniq.cc pauniq.hh levels.cc virtstruc.cc regexopt.cc regexopt.hh \
+	pauniq.cc pauniq.hh pabitset.cc pabitset.hh levels.cc virtstruc.cc regexopt.cc regexopt.hh \
 	normattr.cc normattr.hh wordlist.cc wordlist.hh keyword.cc keyword.hh
 libcorp_la_LIBADD = -ldl
 corp_headers = corpus.hh corpconf.hh posattr.hh bgrstat.hh subcorp.hh \

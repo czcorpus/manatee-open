@@ -5,6 +5,10 @@
 
 #include "binfile.hh"
 #include "fstream.hh"
+#include "bitio.hh"
+#include "excep.hh"
+#include <cstring>
+#include <vector>
 
 template <class TextFileClass>
 class delta_text {
@@ -132,6 +136,93 @@ typedef giga_delta_text<BinCachedFile<uint8_t>,
 typedef giga_delta_text<MapBinFile<uint8_t>,
 			MapBinFile<uint16_t>,
 			MapBinFile<uint32_t> > map_map_giga_delta_text;
+
+
+/**
+ * list_text: a sorted set of ids per position (possibly empty)
+ *
+ * .ltext     -- 32-byte header (signature, seg_size, text_size) followed by
+ *               a bit stream; each position is gamma(count+1) followed by
+ *               count delta-coded gaps between consecutive ids (the first
+ *               gap is taken from -1)
+ * .ltext.seg -- uint64_t absolute bit offset of every seg_size-th position
+ *
+ * Written by ListTextConsumer (consumer.hh).
+ */
+template <class TextFileClass>
+class list_text {
+protected:
+    int seg_size;
+    NumOfPos text_size;
+
+    TextFileClass wordseq;
+    MapBinFile<uint64_t> segments;
+public:
+    static const int header_size = 32;
+    class const_iterator {
+	typedef typename TextFileClass::const_iterator iter;
+	read_bits<iter> rb;
+	NumOfPos rest;
+    public:
+	const_iterator (iter i, NumOfPos count, int skipbits=0)
+	    : rb (i, skipbits), rest (count) {}
+	// fills out with the ids of the next position, false at the end
+	bool next (std::vector<int> &out) {
+	    out.clear();
+	    if (rest-- <= 0)
+		return false;
+	    int id = -1;
+	    for (unsigned count = rb.gamma() -1; count; count--) {
+		id += rb.delta();
+		out.push_back (id);
+	    }
+	    return true;
+	}
+	bool skip() {
+	    if (rest-- <= 0)
+		return false;
+	    for (unsigned count = rb.gamma() -1; count; count--)
+		rb.delta();
+	    return true;
+	}
+    };
+    list_text (const std::string &filename, NumOfPos ts=0)
+	:wordseq (filename + ".ltext"), segments (filename + ".ltext.seg") {
+	unsigned char head [header_size];
+	if (wordseq.size() < header_size)
+	    throw FileAccessError (filename + ".ltext", "list_text: header");
+	typename TextFileClass::const_iterator h = wordseq.at (0);
+	for (int i = 0; i < header_size; i++, ++h)
+	    head [i] = *h;
+	if (memcmp (head, "\243finLT", 6))
+	    throw FileAccessError (filename + ".ltext", "list_text: signature");
+	uint32_t ss;
+	int64_t ts64;
+	memcpy (&ss, head + 8, sizeof (ss));
+	memcpy (&ts64, head + 16, sizeof (ts64));
+	seg_size = ss;
+	text_size = ts64;
+    }
+    const_iterator at (Position pos) {
+	if (pos < 0) pos = 0;
+	if (pos >= text_size)
+	    return const_iterator (wordseq.at (header_size), 0);
+	NumOfPos rest = pos % seg_size;
+	uint64_t seek = segments [pos / seg_size];
+	const_iterator t (wordseq.at (seek/8), text_size - pos + rest, seek%8);
+	while (rest--)
+	    t.skip();
+	return t;
+    }
+    void pos2ids (Position pos, std::vector<int> &out) {
+	at(pos).next (out);
+    }
+    NumOfPos size () {
+	return text_size;
+    }
+};
+
+typedef list_text<MapBinFile<unsigned char> > map_list_text;
 
 
 class cqp_text: public MapNetIntFile {

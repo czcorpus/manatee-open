@@ -3,11 +3,19 @@
 #include "fromtof.hh"
 #include <iostream>
 #include <stdint.h>
+#include <vector>
 
 int main (int argc, char **argv) {
+    bool sets = argc > 1 && !strcmp (argv[1], "-s");
+    if (sets) {
+        argc--;
+        argv++;
+    }
     if (argc < 3) {
-        cerr << "Usage: dumpattrtext CORPUS ATTR\n"
+        cerr << "Usage: dumpattrtext [-s] CORPUS ATTR\n"
              << "Dumps text of (virtual) corpus attribute\n"
+             << "-s        dump the set of ids at every position (count\n"
+             << "          followed by the ids), for TYPE BITSET attributes\n"
              << "CORPUS    corpus configuration file\n"
              << "ATTR      attribute name\n";
         return 1;
@@ -23,8 +31,18 @@ int main (int argc, char **argv) {
         pa = struc->get_attr (dot);
     } else
         pa = c.get_attr (argv[2]);
-    IDIterator *it = pa->posat(0);
     ToFile <int32_t> out (stdout);
+    if (sets) {
+        std::vector<int> ids;
+        for (NumOfPos p = 0; p < max_pos; p++) {
+            pa->posset (p, ids);
+            out.put (ids.size());
+            for (size_t i = 0; i < ids.size(); i++)
+                out.put (ids[i]);
+        }
+        return 0;
+    }
+    IDIterator *it = pa->posat(0);
     for (NumOfPos p = 0; p < max_pos; p++)
         out.put (it->next());
 }

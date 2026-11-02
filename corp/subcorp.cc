@@ -205,6 +205,8 @@ public:
     virtual const char* id2str (int id) {return attr->id2str (id);}
     virtual int str2id (const char *str) {return attr->str2id (str);}
     virtual int pos2id (Position pos) {return attr->pos2id (pos);}
+    virtual void posset (Position pos, std::vector<int> &out)
+        {attr->posset (pos, out);}
     virtual const char* pos2str (Position pos) {return attr->pos2str (pos);}
     virtual IDIterator *posat (Position pos) {return attr->posat (pos);}
     virtual IDPosIterator *idposat (Position pos) {return attr->idposat (pos);}

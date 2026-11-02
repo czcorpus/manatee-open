@@ -274,6 +274,8 @@ void CorpInfo::set_defaults (CorpInfo *global, type_t d_type) {
         break;
     case Attr_type:
         opt_defs = attr_defs;
+        if (opts["TYPE"] == "BITSET" && opts["MULTISEP"].empty())
+            opts["MULTISEP"] = "|";
         if (str2bool (global->opts["NESTED"]))
             opts["MULTIVALUE"] = "y";
         if (!opts["DYNLIB"].empty()) {

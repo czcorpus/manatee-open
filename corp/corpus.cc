@@ -4,6 +4,7 @@
 #include "subcorp.hh"
 #include "dynattr.hh"
 #include "normattr.hh"
+#include "pabitset.hh"
 #include "binfile.hh"
 #include "fromtof.hh"
 #include "fsop.hh"
@@ -57,6 +58,9 @@ PosAttr *Corpus::setup_attr (const string &attr_name, bool skip_subcorp)
             pa = setup_virtposattr (virt, path + name, name, ao["LOCALE"],
                                     conf->opts["ENCODING"], true,
                                     ao["DEFAULTVALUE"], conf->opts["DOCSTRUCTURE"]);
+        else if (ao["TYPE"] == "BITSET")
+            pa = createBitsetPosAttr (path + name, name, ao["LOCALE"],
+                                      conf->opts["ENCODING"], ao["MULTISEP"]);
         else
             pa = createPosAttr (ao["TYPE"], path + name, name, ao["LOCALE"], 
                                 conf->opts["ENCODING"]);

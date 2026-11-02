@@ -129,6 +129,26 @@ double static bgr_pure_freq (double f_AB, double, double, double)
     return f_AB;
 }
 
+// TYPE BITSET attributes hold a set of values at each position: collocations
+// take every value of the set (empty sets are skipped), posat() would give
+// a single representative value only
+static bool is_bitset_attr (Corpus *c, PosAttr *a)
+{
+    return c->get_conf (a->name + ".TYPE") == "BITSET";
+}
+
+// calls fn(id) for every value at positions from..to (clipped to the corpus)
+template <class Fn>
+static void for_each_value (PosAttr *a, Position from, Position to, Fn fn)
+{
+    vector<int> ids;
+    for (Position p = max (from, Position (0)); p <= to && p < a->size(); p++) {
+        a->posset (p, ids);
+        for (size_t j = 0; j < ids.size(); j++)
+            fn (ids[j]);
+    }
+}
+
 
 void Concordance::find_coll (ostream &out, const string &attr, 
                              const string &cmpr, NumOfPos minfreq, 
@@ -152,8 +172,22 @@ void Concordance::find_coll (ostream &out, const string &attr,
     }
 
     unordered_map<int,NumOfPos> bs;  // (attr_id, count)
+    const bool bitset = is_bitset_attr (corp, a);
     for (Position i = 0; i < size(); i++) {
         if (rng[i].beg == -1) continue;
+        if (bitset) {
+            auto count = [&] (int id) {
+                if (a->freq (id) >= minfreq)
+                    bs [id] ++;
+            };
+            if (fromw < 0)
+                for_each_value (a, rng[i].beg + fromw,
+                                rng[i].beg + min (tow, -1), count);
+            if (tow > 0)
+                for_each_value (a, rng[i].end -1 + (fromw > 0 ? fromw : 1),
+                                rng[i].end -1 + tow, count);
+            continue;
+        }
         if (fromw < 0) {
             IDIterator *pi = a->posat (rng[i].beg + fromw);
             for (int d = fromw; d < 0 && d <= tow; d++) {
@@ -245,8 +279,26 @@ CollocItems (Concordance *conc, const string &attr_name, char sort_fun_code,
     unordered_map<int,NumOfPos> bs;
     set<int> collocs;
     set<int>::iterator it;
+    const bool bitset = is_bitset_attr (conc->corp, attr);
     for (Position i = 0; i < conc->size(); i++) {
         if (conc->beg_at(i) == -1) continue;
+        if (bitset) {
+            auto collect = [&] (int id) {
+                if (attr->freq (id) >= minfreq)
+                    collocs.insert (id);
+            };
+            if (fromw < 0)
+                for_each_value (attr, conc->beg_at(i) + fromw,
+                                conc->beg_at(i) + min (tow, -1), collect);
+            if (tow > 0)
+                for_each_value (attr,
+                                conc->end_at(i) -1 + (fromw > 0 ? fromw : 1),
+                                conc->end_at(i) -1 + tow, collect);
+            for (it = collocs.begin(); it != collocs.end(); it ++)
+                bs [*it] ++;
+            collocs.clear();
+            continue;
+        }
         if (fromw < 0) {
             Position beg = conc->beg_at(i) + fromw;
             IDIterator *pi = attr->posat (beg);

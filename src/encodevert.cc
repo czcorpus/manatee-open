@@ -594,9 +594,111 @@ public:
 
 };
 
-write_attr *new_write_attr (const string &filename, CorpInfo::MSS &aopts, 
+// set of values per position (TYPE BITSET), the input value is split on sep
+class write_bitset_attr: public write_attr {
+protected:
+#ifdef LEXICON_USE_FSA3
+    write_fsalex *lex;
+#else
+    write_lexicon *lex;
+#endif
+    RevFileConsumer *rev;
+    ListTextConsumer *corp;
+    const char sep;
+    int empty_id;
+    string buf;
+    vector<int> ids;
+public:
+    write_bitset_attr (const string &filename, const char *def, char sep)
+        : write_attr (filename, def, true),
+#ifdef LEXICON_USE_FSA3
+        lex (new write_fsalex(filename, true)),
+#else
+        lex (new write_lexicon(filename, tt_scaling(TextConsumer::tdelta, lex_mem))),
+#endif
+        rev (RevFileConsumer::create (name, tt_scaling(TextConsumer::tdelta, rev_mem), -1)),
+        corp (new ListTextConsumer (name + ".ltext")), sep (sep),
+        empty_id (lex->str2id ("")) {
+        currpos = 0;
+    }
+    ~write_bitset_attr () {
+        delete lex; delete corp; delete rev;
+    }
+    void write (char *str, const char *curr_fileline = 0, NumOfPos s = 0) {
+        if (!str)
+            str = default_val;
+        char *begin = str;
+        size_t end;
+        for (; *str == ' '; str++);
+        for (end = strlen(str); end && str[end-1] == ' '; end--);
+        if (begin != str || end != strlen(str)) {
+            str[end] = 0;
+            if (!curr_fileline) {
+                curr_fileline = fileline();
+            }
+            err_strip_space.emit_err (curr_fileline);
+        }
+        if (end > 32766) {
+            end = 32766;
+            str[end] = 0;
+            if (!curr_fileline) {
+                curr_fileline = fileline();
+            }
+            err_overlong_attr.emit_err (curr_fileline);
+        }
+        ids.clear();
+        for (size_t b = 0; b <= end; b++) {
+            size_t e = b;
+            while (e < end && str[e] != sep)
+                e++;
+            size_t vb = b, ve = e;
+            for (; vb < ve && str[vb] == ' '; vb++);
+            for (; ve > vb && str[ve-1] == ' '; ve--);
+            if (ve > vb) { // empty values (e.g. "a||b") are skipped
+                buf.assign (str + vb, ve - vb);
+                ids.push_back (lex->str2id (buf.c_str()));
+            }
+            b = e;
+        }
+        sort (ids.begin(), ids.end());
+        ids.erase (unique (ids.begin(), ids.end()), ids.end());
+        corp->put (ids);
+        if (ids.empty())
+            rev->put (empty_id, currpos);
+        for (size_t i = 0; i < ids.size(); i++)
+            rev->put (ids[i], currpos);
+        currpos++;
+    }
+    void fill_up_to (Position pos) {
+        while (currpos < pos)
+            write (default_val);
+    }
+    void write (const char *str, Position pos, const char *curr_fileline=0,
+                NumOfPos size = 0) {
+        if (pos < currpos) {
+            if (!curr_fileline)
+                curr_fileline = fileline();
+            CERR << curr_fileline
+                 << "error: corrupted file (" << name
+                 << "), incorrect position: " << pos
+                 << " instead of " << currpos << '\n';
+            return;
+        }
+        fill_up_to (pos);
+        write ((char *) str, curr_fileline, size);
+    }
+};
+
+write_attr *new_write_attr (const string &filename, CorpInfo::MSS &aopts,
                             TextConsumer::TextType deftt)
 {
+    if (aopts["TYPE"] == "BITSET") {
+        if (append_opt)
+            throw runtime_error ("appending (-e) is not supported for "
+                                 "TYPE BITSET attributes: " + filename);
+        return new write_bitset_attr (filename, aopts["DEFAULTVALUE"].c_str(),
+                                      aopts["MULTISEP"][0]);
+    }
     if (aopts["TYPE"] == "UNIQUE") return
         new write_unique_attr (filename,
             aopts["DEFAULTVALUE"].empty() ? "===NONE===" : aopts["DEFAULTVALUE"].c_str(),

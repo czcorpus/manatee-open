@@ -114,18 +114,18 @@ libcorp_la_DEPENDENCIES =
 am__libcorp_la_SOURCES_DIST = corpconf.cc corpus.cc dynattr.cc \
 	dynfun.cc loadconf.cc posattr.cc struct.cc subcorp.cc \
 	bgrstat.cc calign.cc dynattr.hh dynfun.hh virtcorp.cc utf8.cc \
-	corpstat.cc pauniq.cc pauniq.hh levels.cc virtstruc.cc \
-	regexopt.cc regexopt.hh normattr.cc normattr.hh wordlist.cc \
-	wordlist.hh keyword.cc keyword.hh corpus.hh corpconf.hh \
-	posattr.hh bgrstat.hh subcorp.hh virtcorp.hh utf8.hh levels.hh \
-	revit.hh
+	corpstat.cc pauniq.cc pauniq.hh pabitset.cc pabitset.hh \
+	levels.cc virtstruc.cc regexopt.cc regexopt.hh normattr.cc \
+	normattr.hh wordlist.cc wordlist.hh keyword.cc keyword.hh \
+	corpus.hh corpconf.hh posattr.hh bgrstat.hh subcorp.hh \
+	virtcorp.hh utf8.hh levels.hh revit.hh
 am__objects_1 =
 @CXXLIB_FALSE@am__objects_2 = $(am__objects_1)
 am_libcorp_la_OBJECTS = corpconf.lo corpus.lo dynattr.lo dynfun.lo \
 	loadconf.lo posattr.lo struct.lo subcorp.lo bgrstat.lo \
-	calign.lo virtcorp.lo utf8.lo corpstat.lo pauniq.lo levels.lo \
-	virtstruc.lo regexopt.lo normattr.lo wordlist.lo keyword.lo \
-	$(am__objects_2)
+	calign.lo virtcorp.lo utf8.lo corpstat.lo pauniq.lo \
+	pabitset.lo levels.lo virtstruc.lo regexopt.lo normattr.lo \
+	wordlist.lo keyword.lo $(am__objects_2)
 libcorp_la_OBJECTS = $(am_libcorp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -151,11 +151,12 @@ am__depfiles_remade = ./$(DEPDIR)/bgrstat.Plo ./$(DEPDIR)/calign.Plo \
 	./$(DEPDIR)/corpus.Plo ./$(DEPDIR)/dynattr.Plo \
 	./$(DEPDIR)/dynfun.Plo ./$(DEPDIR)/keyword.Plo \
 	./$(DEPDIR)/levels.Plo ./$(DEPDIR)/loadconf.Plo \
-	./$(DEPDIR)/normattr.Plo ./$(DEPDIR)/pauniq.Plo \
-	./$(DEPDIR)/posattr.Plo ./$(DEPDIR)/regexopt.Plo \
-	./$(DEPDIR)/struct.Plo ./$(DEPDIR)/subcorp.Plo \
-	./$(DEPDIR)/utf8.Plo ./$(DEPDIR)/virtcorp.Plo \
-	./$(DEPDIR)/virtstruc.Plo ./$(DEPDIR)/wordlist.Plo
+	./$(DEPDIR)/normattr.Plo ./$(DEPDIR)/pabitset.Plo \
+	./$(DEPDIR)/pauniq.Plo ./$(DEPDIR)/posattr.Plo \
+	./$(DEPDIR)/regexopt.Plo ./$(DEPDIR)/struct.Plo \
+	./$(DEPDIR)/subcorp.Plo ./$(DEPDIR)/utf8.Plo \
+	./$(DEPDIR)/virtcorp.Plo ./$(DEPDIR)/virtstruc.Plo \
+	./$(DEPDIR)/wordlist.Plo
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
@@ -424,9 +425,9 @@ noinst_LTLIBRARIES = libcorp.la
 libcorp_la_SOURCES = corpconf.cc corpus.cc dynattr.cc dynfun.cc \
 	loadconf.cc posattr.cc struct.cc subcorp.cc bgrstat.cc \
 	calign.cc dynattr.hh dynfun.hh virtcorp.cc utf8.cc corpstat.cc \
-	pauniq.cc pauniq.hh levels.cc virtstruc.cc regexopt.cc \
-	regexopt.hh normattr.cc normattr.hh wordlist.cc wordlist.hh \
-	keyword.cc keyword.hh $(am__append_1)
+	pauniq.cc pauniq.hh pabitset.cc pabitset.hh levels.cc \
+	virtstruc.cc regexopt.cc regexopt.hh normattr.cc normattr.hh \
+	wordlist.cc wordlist.hh keyword.cc keyword.hh $(am__append_1)
 libcorp_la_LIBADD = -ldl
 corp_headers = corpus.hh corpconf.hh posattr.hh bgrstat.hh subcorp.hh \
 	virtcorp.hh utf8.hh levels.hh revit.hh
@@ -498,6 +499,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/levels.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/loadconf.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/normattr.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pabitset.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pauniq.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/posattr.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regexopt.Plo@am__quote@ # am--include-marker
@@ -700,6 +702,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/levels.Plo
 	-rm -f ./$(DEPDIR)/loadconf.Plo
 	-rm -f ./$(DEPDIR)/normattr.Plo
+	-rm -f ./$(DEPDIR)/pabitset.Plo
 	-rm -f ./$(DEPDIR)/pauniq.Plo
 	-rm -f ./$(DEPDIR)/posattr.Plo
 	-rm -f ./$(DEPDIR)/regexopt.Plo
@@ -765,6 +768,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/levels.Plo
 	-rm -f ./$(DEPDIR)/loadconf.Plo
 	-rm -f ./$(DEPDIR)/normattr.Plo
+	-rm -f ./$(DEPDIR)/pabitset.Plo
 	-rm -f ./$(DEPDIR)/pauniq.Plo
 	-rm -f ./$(DEPDIR)/posattr.Plo
 	-rm -f ./$(DEPDIR)/regexopt.Plo

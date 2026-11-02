@@ -10,6 +10,8 @@
 #include "fstream.hh"
 #include <limits>
 #include <stdexcept>
+#include <algorithm>
+#include <cstring>
 
 using namespace std;
 
@@ -262,6 +264,69 @@ public:
 };
 
 const char IntTextConsumer::signature[16] = "\243finIT\0\0\0\0\0\0\0\0\0";
+
+
+const char ListTextConsumer::signature[7] = "\243finLT";
+
+ListTextConsumer::ListTextConsumer (const string &path, int seg_size)
+    : path (path), seg_size (seg_size), text_size (0),
+      textf (fopen (path.c_str(), "wb")), bitfile (NULL), wb (NULL), seg (NULL)
+{
+    if (!textf) throw FileAccessError (path, "ListTextConsumer()");
+    if (seg_size <= 0) {
+        fclose (textf);
+        throw invalid_argument ("ListTextConsumer: seg_size must be positive");
+    }
+    seg = new ToFile<uint64_t> (path + ".seg");
+    bitfile = new OutFileBits_tell (textf);
+    // header placeholder, filled in by the destructor
+    for (int i = 0; i < 32; i++, ++(*bitfile))
+        *(*bitfile) = 0;
+    wb = new Writer (*bitfile);
+}
+
+ListTextConsumer::~ListTextConsumer() noexcept(false)
+{
+    delete wb; // flushes the last partial byte
+    // padding so that readers never touch bytes past the end of file
+    for (int i = 0; i < 8; i++, ++(*bitfile))
+        *(*bitfile) = 0;
+    delete bitfile;
+    delete seg;
+
+    unsigned char head [32] = {0};
+    uint32_t ss = seg_size;
+    int64_t ts = text_size;
+    memcpy (head, signature, sizeof (signature) -1);
+    memcpy (head + 8, &ss, sizeof (ss));
+    memcpy (head + 16, &ts, sizeof (ts));
+    fseeko (textf, 0, SEEK_SET);
+    if (fwrite (head, sizeof (head), 1, textf) != 1) {
+        fclose (textf);
+        throw FileAccessError (path, "~ListTextConsumer(): fwrite");
+    }
+    if (fclose (textf))
+        throw FileAccessError (path, "~ListTextConsumer(): fclose");
+}
+
+void ListTextConsumer::put (const vector<int> &ids)
+{
+    buf.assign (ids.begin(), ids.end());
+    sort (buf.begin(), buf.end());
+    buf.erase (unique (buf.begin(), buf.end()), buf.end());
+    if (!buf.empty() && buf[0] < 0)
+        throw invalid_argument ("ListTextConsumer::put: negative id");
+
+    if (text_size % seg_size == 0)
+        (*seg) (uint64_t (bitfile->tell()) * 8 + wb->bitslen());
+    wb->gamma (buf.size() +1);
+    int prev = -1;
+    for (size_t i = 0; i < buf.size(); i++) {
+        wb->delta (unsigned (buf[i]) - unsigned (prev));
+        prev = buf[i];
+    }
+    text_size++;
+}
 
 
 TextConsumer* TextConsumer::create (TextConsumer::TextType tt, 

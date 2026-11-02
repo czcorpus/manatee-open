@@ -43,10 +43,15 @@ for ATTR in $ATTRLIST; do
     echo "Processing attribute '$ATTR'..."
     [ "`corpinfo -g $ATTR.DYNAMIC $CORPUS`" ] && continue;
     ATTRTYPE=`corpinfo -g $ATTR.TYPE $CORPUS`
+    DUMPATTRTEXT_OPT=""
     if [[ $ATTRTYPE =~ GD$ ]]; then
         MKDTEXT_OPT="-g"
     elif [[ $ATTRTYPE =~ BD$ ]]; then
         MKDTEXT_OPT="-b"
+    elif [[ $ATTRTYPE == BITSET ]]; then
+        # sets of ids per position, written as .ltext
+        DUMPATTRTEXT_OPT="-s"
+        MKDTEXT_OPT="-l"
     else
         MKDTEXT_OPT=""
     fi
@@ -57,7 +62,7 @@ for ATTR in $ATTRLIST; do
     dry_run "dumpattrrev $CORPUS $ATTR | mkdrev $OUTDIR/$ATTR"
     echo "done."
     echo "Creating .text.* files..."
-    dry_run "dumpattrtext $CORPUS $ATTR | mkdtext $MKDTEXT_OPT $OUTDIR/$ATTR"
+    dry_run "dumpattrtext $DUMPATTRTEXT_OPT $CORPUS $ATTR | mkdtext $MKDTEXT_OPT $OUTDIR/$ATTR"
     echo "done."
 done
 

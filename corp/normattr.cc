@@ -20,6 +20,8 @@ public:
     virtual const char* id2str (int id) {return srcattr->id2str (id);}
     virtual int str2id(const char *str) {return srcattr->str2id (str);}
     virtual int pos2id (Position pos) {return srcattr->pos2id (pos);}
+    virtual void posset (Position pos, std::vector<int> &out)
+        {srcattr->posset (pos, out);}
     virtual const char* pos2str (Position pos) {return srcattr->pos2str (pos);}
     virtual IDIterator *posat (Position pos) {return srcattr->posat (pos);}
     virtual IDPosIterator *idposat (Position pos) {return srcattr->idposat (pos);}

@@ -363,7 +363,12 @@ public:
     crit_pos_attr (Corpus *c, RangeStream *r, const string &attr,
                    const char *ctxstr)
         : criteria_base (c, r, attr),
-          ctx (prepare_context (c, ctxstr, true)) {}
+          ctx (prepare_context (c, ctxstr, true)) {
+            // TYPE BITSET: pos2str() joins the set with MULTISEP, so the
+            // freq. distribution counts every value of the set
+            if (c->get_conf(pa->name + ".TYPE") == "BITSET")
+                multisep = c->get_conf(pa->name + ".MULTISEP").c_str();
+        }
     virtual ~crit_pos_attr() {
         delete ctx;
     }
@@ -373,13 +378,17 @@ public:
 class crit_range : public criteria_base {
     Concordance::context *beg;
     Concordance::context *end;
+    const char *bitset_sep;
 public:
     crit_range (Corpus *c, RangeStream *r, const string &attr,
                 const char *ctxbeg, const char *ctxend)
         : criteria_base (c, r, attr),
           beg (prepare_context (c, ctxbeg, true)),
-          end (prepare_context (c, ctxend, false))
-    {}
+          end (prepare_context (c, ctxend, false)), bitset_sep (NULL)
+    {
+        if (c->get_conf(pa->name + ".TYPE") == "BITSET")
+            bitset_sep = c->get_conf(pa->name + ".MULTISEP").c_str();
+    }
     virtual ~crit_range() {
         delete beg;
         delete end;
@@ -389,6 +398,10 @@ public:
         ostringstream oss;
         Position b = beg->get (r);
         Position e = end->get (r);
+        // TYPE BITSET: a single position range counts every value of the set
+        // (as crit_pos_attr), a longer one counts the sequence of whole sets
+        if (bitset_sep)
+            multisep = (b == e && !output_ids) ? bitset_sep : NULL;
         TextIterator *ti = NULL;
         IDIterator *ii = NULL;
         if (b <= e) {

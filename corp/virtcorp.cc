@@ -465,6 +465,16 @@ public:
             return -1;
         return (*segs[sg].tonewid)[segs[sg].src->pos2id (orgpos)];
     }
+    virtual void posset (Position pos, std::vector<int> &out) {
+        out.clear();
+        size_t sg, tr;
+        Position orgpos = locate_tran (pos, sg, tr);
+        if (orgpos < 0)
+            return;
+        segs[sg].src->posset (orgpos, out);
+        for (size_t i = 0; i < out.size(); i++)
+            out[i] = (*segs[sg].tonewid)[out[i]];
+    }
     virtual const char* pos2str (Position pos) {
         size_t sg, tr;
         Position orgpos = locate_tran (pos, sg, tr);

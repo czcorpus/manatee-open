@@ -111,7 +111,19 @@ LOCALE		locale code of a used language (and region). This
 
 TYPE		Storage and access type of an attribute.
 		Use "FD_FGD" for corpora bigger than 200M tokens.
-		
+		Use "BITSET" for an attribute holding a set of values
+		(e.g. Case=Nom|Number=Sing) at every position: the value
+		is split on MULTISEP (default "|" for BITSET), each part
+		is indexed separately, so [feats="Case=Nom"] finds every
+		token having that part and [feats=""] tokens having none.
+		Note that "|" in a query is a regular expression
+		alternation: [feats="Case=Nom|Number=Plur"] means either
+		part. Combine parts with & instead. The value must be
+		quoted (TYPE "BITSET"), unquoted upper-case values are
+		not accepted by the configuration parser.
+		Not supported for structure attributes and not with
+		encodevert -e (append).
+
 
 MULTIVALUE	indicate whether the attribute has multivalues
   MULTISEP	defines multivalue separator, if empty ("") value is

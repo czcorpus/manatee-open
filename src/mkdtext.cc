@@ -8,16 +8,19 @@
 #include <unistd.h>
 #include <iostream>
 #include <cstdlib>
+#include <stdexcept>
+#include <vector>
 #include <sys/stat.h>
 
 using namespace std;
 
 void usage()
 {
-    cerr << "usage: mkdtext [-b|-g|-i] [-a] DELTATEXT_PATH [FILENAME]\n"
+    cerr << "usage: mkdtext [-b|-g|-i|-l] [-a] DELTATEXT_PATH [FILENAME]\n"
          << "    -b    create big_delta_text\n"
          << "    -g    create giga_delta_text\n"
          << "    -i    create int_text\n"
+         << "    -l    create list_text (TYPE BITSET) from dumpattrtext -s\n"
          << "    -a    append positions to the end\n"
          << "    -e    only write header according to .off/.seg\n"
         ;
@@ -27,14 +30,17 @@ int main (int argc, char **argv)
 {
     const char *progname = argv[0];
     TextConsumer::TextType ttype = TextConsumer::tdelta;
-    bool append_to_end = false, write_header = false;
+    bool append_to_end = false, write_header = false, list_text = false;
     char *outname;
     FILE *input = stdin;
     {
         // process options
         int c;
-        while ((c = getopt (argc, argv, "?haebgi")) != -1)
+        while ((c = getopt (argc, argv, "?haebgil")) != -1)
             switch (c) {
+            case 'l':
+                list_text = true;
+                break;
             case 'a':
                 append_to_end = true;
                 break;
@@ -115,7 +121,26 @@ int main (int argc, char **argv)
                  << ", text size " << text_size << "\n";
             return 0;
         }
-        TextConsumer *dtextcons = 
+        if (list_text) {
+            // input: count followed by count ids, for every position
+            ListTextConsumer ltextcons (string (outname) + ".ltext");
+            FromFile<int> ci (input);
+            vector<int> ids;
+            while (!ci) {
+                int count = *ci;
+                ++ci;
+                ids.clear();
+                for (; count > 0; count--, ++ci) {
+                    bool has_data = !ci; // FromFile::operator! means "not at end"
+                    if (!has_data)
+                        throw runtime_error ("mkdtext: truncated input");
+                    ids.push_back (*ci);
+                }
+                ltextcons.put (ids);
+            }
+            return 0;
+        }
+        TextConsumer *dtextcons =
             TextConsumer::create (ttype, string (outname));
         FromFile<int> ci (input);
         while (!ci) {

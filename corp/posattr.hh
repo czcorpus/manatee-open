@@ -7,6 +7,7 @@
 #include "wordlist.hh"
 #include "fsop.hh"
 #include <exception>
+#include <vector>
 
 using namespace std;
 
@@ -77,6 +78,13 @@ public:
             WordList (path, fpath, n, loc, enc) {}
     virtual ~PosAttr () {delete frq;}
     virtual int pos2id (Position pos) =0;
+    // set of ids at pos; single-valued attributes yield {pos2id(pos)}
+    virtual void posset (Position pos, std::vector<int> &out) {
+        out.clear();
+        int id = pos2id (pos);
+        if (id >= 0)
+            out.push_back (id);
+    }
     virtual const char* pos2str (Position pos) =0;
     virtual IDIterator *posat (Position pos) =0;
     virtual TextIterator *textat (Position pos) =0;

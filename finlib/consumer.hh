@@ -5,7 +5,9 @@
 
 #include "fstream.hh"
 #include "revidx.hh"
+#include "bitio.hh"
 #include <string>
+#include <vector>
 
 class TextConsumer {
 protected:
@@ -21,6 +23,30 @@ public:
                                  bool append=false);
 private:
     TextType type;
+};
+
+
+class OutFileBits_tell;
+template <class ValueType> class ToFile;
+
+// writes a list_text (text.hh): one set of ids per position
+class ListTextConsumer {
+    typedef write_bits<OutFileBits_tell&,unsigned char,unsigned char*> Writer;
+    std::string path;
+    int seg_size;
+    Position text_size;
+    FILE *textf;
+    OutFileBits_tell *bitfile;
+    Writer *wb;
+    ToFile<uint64_t> *seg;
+    std::vector<int> buf;
+    static const char signature[7];
+public:
+    ListTextConsumer (const std::string &path, int seg_size=64);
+    ~ListTextConsumer() noexcept(false);
+    // ids need not be sorted; duplicates are dropped, negative ids rejected
+    void put (const std::vector<int> &ids);
+    Position curr_size() {return text_size;}
 };
 
 

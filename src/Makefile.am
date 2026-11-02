@@ -5,7 +5,12 @@ bin_PROGRAMS = manateesrv corpinfo encodevert mkdynattr lscbgr lsclex mknorms \
 	mknormattr filterquery2attr lskw maplexrev lswl mkwc mktokencov filterlexrev
 dist_bin_SCRIPTS = filterquery2attr.sh
 noinst_PROGRAMS = tstcqpgr dumplevel dumpvirt tstregexopt cfreqs
+check_PROGRAMS = tstlisttext tstbitsetattr
+TESTS = $(check_PROGRAMS)
 AM_DEFAULT_SOURCE_EXT=.cc
+tstlisttext_LDADD = $(top_builddir)/finlib/libfin.la
+tstbitsetattr_LDADD = $(top_builddir)/corp/libcorp.la \
+	$(top_builddir)/query/libquery.la $(top_builddir)/finlib/libfin.la $(LDADD)
 dumplevel_LDADD = $(top_builddir)/corp/libcorp.la
 dumpvirt_LDADD = $(top_builddir)/corp/libcorp.la \
 	$(top_builddir)/finlib/libfin.la $(top_builddir)/query/libquery.la $(LDADD)
