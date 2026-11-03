@@ -6,7 +6,7 @@ please refer to a respective branch (e.g. `release-2.223.6`).
 ## How to build
 
 0. make sure  `build-essential`, `libtool`, `autoconf-archive` are installed
-1. clone the repository, make sure all the dependencies are installed (:construction: - list deps):
+1. clone the repository, make sure all the dependencies are installed (🚧 - list deps):
    * `libpcre3-dev`
    * `bison`
    * `libltdl-dev`
