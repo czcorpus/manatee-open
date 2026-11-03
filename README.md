@@ -17,6 +17,64 @@ please refer to a respective branch (e.g. `release-2.223.6`).
 5. `sudo make install`
 6. `sudo ldconfig`
 
+
+For Ubuntu 26.04 (and other recent distributions without `libpcre3-dev` and `swig3.0`),
+see the notes below.
+
+## Ubuntu 26.04 installation notes
+
+Ubuntu 26.04 no longer provides two of the required packages:
+
+* `libpcre3-dev` (PCRE1) – Manatee includes `<pcre.h>` (PCRE1 API), so `libpcre2-dev` cannot be used as a replacement
+* `swig3.0` – the `swig` package is SWIG 4, which is not compatible with Manatee's interface files
+  (SWIG 4 dropped the `$function` alias used in `%exception` blocks; the build then fails on
+  `'$function' was not declared in this scope` in `manatee_py_wrap.cc`)
+
+Both can be built from source and installed into separate prefixes under `/opt`, so they don't
+interfere with the system versions.
+
+### 1. Install the build tools
+
+```bash
+sudo apt install build-essential automake autoconf autoconf-archive libtool pkg-config bison libltdl-dev
+```
+
+### 2. Build PCRE 8.45 (last PCRE1 release)
+
+```bash
+wget https://sourceforge.net/projects/pcre/files/pcre/8.45/pcre-8.45.tar.bz2
+tar xjf pcre-8.45.tar.bz2 && cd pcre-8.45
+./configure --prefix=/opt/pcre1 --enable-utf --enable-unicode-properties
+make -j"$(nproc)" && sudo make install
+```
+
+### 3. Build SWIG 3.0.12
+
+```bash
+wget https://sourceforge.net/projects/swig/files/swig/swig-3.0.12/swig-3.0.12.tar.gz
+tar xzf swig-3.0.12.tar.gz && cd swig-3.0.12
+./configure --prefix=/opt/swig3 --with-pcre-prefix=/opt/pcre1
+make -j"$(nproc)" && sudo make install
+```
+
+### 4. Build Manatee
+
+```bash
+cd manatee-open
+autoreconf --install --force
+export PATH=/opt/pcre1/bin:$PATH     # makes pcre-config visible to configure
+./configure --with-pcre SWIG=/opt/swig3/bin/swig \
+    CPPFLAGS="-I/opt/pcre1/include" \
+    LDFLAGS="-L/opt/pcre1/lib -Wl,-rpath,/opt/pcre1/lib"
+make
+sudo make install
+sudo ldconfig
+```
+
+The `-rpath` flag records `/opt/pcre1/lib` in the built binaries and the Python module, so
+`libpcre.so.1` is found at runtime without setting `LD_LIBRARY_PATH`.
+
+
 ## Available versions
 
 * [2.214.1](https://github.com/czcorpus/manatee-open/tree/release-2.214.1)
