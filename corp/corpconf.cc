@@ -306,6 +306,14 @@ void CorpInfo::set_defaults (CorpInfo *global, type_t d_type) {
     case Struct_type:
         opts["ENCODING"] = global->opts["ENCODING"];
         this->conffile = global->conffile;
+        // Structure attributes resolve their default LOCALE against this
+        // structure (see Attr_type above), so inherit the corpus-level
+        // locale settings unless the structure overrides them.
+        if (opts["DEFAULTLOCALE"].empty() && opts["LANGUAGE"].empty()) {
+            opts["DEFAULTLOCALE"] = global->opts["DEFAULTLOCALE"];
+            if (opts["DEFAULTLOCALE"].empty())
+                opts["LANGUAGE"] = global->opts["LANGUAGE"];
+        }
         for (VSC::iterator i = attrs.begin(); i != attrs.end(); i++) {
             set_defs_from_array ((*i).second->opts, struct_attr_defs);
             (*i).second->set_defaults (this, Attr_type);
